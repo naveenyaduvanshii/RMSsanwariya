@@ -1,0 +1,134 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+class EmailJSService {
+
+  //////////////////////////////////////////////////////
+  // EMAILJS CONFIG
+  //////////////////////////////////////////////////////
+
+  static const String serviceId = "service_rhgn5ny";
+  static const String templateId = "template_g1zlcb8";
+  static const String publicKey = "-RTKY5r8DPAl4jvTx";
+   // PRIVATE KEY
+  static const String privateKey = "Ml_JjC_nF5kbGfKU9HMxp";
+
+  //////////////////////////////////////////////////////
+  // SEND OTP EMAIL
+  //////////////////////////////////////////////////////
+
+  static Future<Map<String, dynamic>> sendOtp({
+    required String email,
+    required String otp,
+  }) async {
+
+    try {
+
+      //////////////////////////////////////////////////////
+      // API URL
+      //////////////////////////////////////////////////////
+
+      final url = Uri.parse(
+        "https://api.emailjs.com/api/v1.0/email/send",
+      );
+
+      //////////////////////////////////////////////////////
+      // REQUEST BODY
+      //////////////////////////////////////////////////////
+
+      final body = {
+
+        "service_id": serviceId,
+
+        "template_id": templateId,
+
+        "user_id": publicKey,
+          // IMPORTANT
+        "accessToken": privateKey,
+
+        "template_params": {
+
+          //////////////////////////////////////////////////////
+          // TEMPLATE VARIABLES
+          //////////////////////////////////////////////////////
+
+          "to_email": email,
+          "otp": otp,
+        }
+      };
+
+      //////////////////////////////////////////////////////
+      // LOG REQUEST
+      //////////////////////////////////////////////////////
+
+      print("📤 EMAIL REQUEST:");
+      print(jsonEncode(body));
+
+      //////////////////////////////////////////////////////
+      // API CALL
+      //////////////////////////////////////////////////////
+
+      final response = await http.post(
+
+        url,
+
+        headers: {
+
+          //////////////////////////////////////////////////////
+          // REMOVE origin HEADER
+          //////////////////////////////////////////////////////
+
+          "Content-Type": "application/json",
+        },
+
+        body: jsonEncode(body),
+      );
+
+      //////////////////////////////////////////////////////
+      // RESPONSE LOG
+      //////////////////////////////////////////////////////
+
+      print("📧 STATUS: ${response.statusCode}");
+      print("📧 BODY: ${response.body}");
+
+      //////////////////////////////////////////////////////
+      // SUCCESS
+      //////////////////////////////////////////////////////
+
+      if (response.statusCode == 200) {
+
+        return {
+
+          "success": true,
+          "message": "OTP sent successfully",
+        };
+      }
+
+      //////////////////////////////////////////////////////
+      // FAILED
+      //////////////////////////////////////////////////////
+
+      return {
+
+        "success": false,
+
+        "error": response.body,
+      };
+
+    } catch (e) {
+
+      //////////////////////////////////////////////////////
+      // ERROR
+      //////////////////////////////////////////////////////
+
+      print("❌ EMAIL ERROR: $e");
+
+      return {
+
+        "success": false,
+
+        "error": e.toString(),
+      };
+    }
+  }
+}
