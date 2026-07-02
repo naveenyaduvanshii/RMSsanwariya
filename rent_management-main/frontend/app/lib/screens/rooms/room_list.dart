@@ -840,188 +840,119 @@ class _RoomsPageState extends State<RoomsPage> {
                     /// FILTERS
                     //////////////////////////////////////////////////////
 
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isMobile = constraints.maxWidth < 600;
 
-                        //////////////////////////////////
-                        /// BUILDING FILTER
-                        //////////////////////////////////
-
-                        SizedBox(
-                          width: 220,
-                          child:
-                              DropdownButtonFormField<
-                                  String>(
-                            value: buildings.any(
-                              (e) =>
-                                  e["id"]
-                                      .toString() ==
-                                  selectedBuilding,
-                            )
-                                ? selectedBuilding
-                                : null,
-
-                            decoration:
-                                const InputDecoration(
-                              labelText:
-                                  "Building",
-                              border:
-                                  OutlineInputBorder(),
+                        final buildingFilter = SizedBox(
+                          width: 180,
+                          child: DropdownButtonFormField<String>(
+                            value: buildings.any((e) => e["id"].toString() == selectedBuilding) ? selectedBuilding : null,
+                            decoration: const InputDecoration(
+                              labelText: "Building",
+                              border: OutlineInputBorder(),
                             ),
-
                             items: buildings.map((b) {
-                              return DropdownMenuItem<
-                                  String>(
-                                value: b["id"]
-                                    .toString(),
-                                child: Text(
-                                  b["name"]
-                                      .toString(),
-                                ),
+                              return DropdownMenuItem<String>(
+                                value: b["id"].toString(),
+                                child: Text(b["name"].toString()),
                               );
                             }).toList(),
-
                             onChanged: (value) async {
-                              selectedBuilding =
-                                  value;
-
-                              selectedFloor =
-                                  null;
-
-                              selectedFlat =
-                                  null;
-
+                              selectedBuilding = value;
+                              selectedFloor = null;
+                              selectedFlat = null;
                               floors.clear();
                               flats.clear();
-
                               if (value != null) {
-                                await loadFloors(
-                                    value);
+                                await loadFloors(value);
                               }
-
                               applyFilters();
                             },
                           ),
-                        ),
+                        );
 
-                        //////////////////////////////////
-                        /// FLOOR FILTER
-                        //////////////////////////////////
-
-                        SizedBox(
-                          width: 180,
-                          child:
-                              DropdownButtonFormField<
-                                  String>(
-                            value: floors.any(
-                              (e) =>
-                                  e["id"]
-                                      .toString() ==
-                                  selectedFloor,
-                            )
-                                ? selectedFloor
-                                : null,
-
-                            decoration:
-                                const InputDecoration(
+                        final floorFilter = SizedBox(
+                          width: 150,
+                          child: DropdownButtonFormField<String>(
+                            value: floors.any((e) => e["id"].toString() == selectedFloor) ? selectedFloor : null,
+                            decoration: const InputDecoration(
                               labelText: "Floor",
-                              border:
-                                  OutlineInputBorder(),
+                              border: OutlineInputBorder(),
                             ),
-
                             items: floors.map((f) {
-                              return DropdownMenuItem<
-                                  String>(
-                                value: f["id"]
-                                    .toString(),
-                                child: Text(
-                                  f["floor_name"]
-                                          ?.toString() ??
-                                      "Floor ${f["floor_number"]}",
-                                ),
+                              return DropdownMenuItem<String>(
+                                value: f["id"].toString(),
+                                child: Text(f["floor_name"]?.toString() ?? "Floor ${f["floor_number"]}"),
                               );
                             }).toList(),
-
                             onChanged: (value) async {
-                              selectedFloor =
-                                  value;
-
-                              selectedFlat =
-                                  null;
-
+                              selectedFloor = value;
+                              selectedFlat = null;
                               flats.clear();
-
                               if (value != null) {
-                                await loadFlats(
-                                    value);
+                                await loadFlats(value);
                               }
-
                               applyFilters();
                             },
                           ),
-                        ),
+                        );
 
-                        //////////////////////////////////
-                        /// FLAT FILTER
-                        //////////////////////////////////
-
-                        SizedBox(
-                          width: 180,
-                          child:
-                              DropdownButtonFormField<
-                                  String>(
-                            value: flats.any(
-                              (e) =>
-                                  e["id"]
-                                      .toString() ==
-                                  selectedFlat,
-                            )
-                                ? selectedFlat
-                                : null,
-
-                            decoration:
-                                const InputDecoration(
+                        final flatFilter = SizedBox(
+                          width: 150,
+                          child: DropdownButtonFormField<String>(
+                            value: flats.any((e) => e["id"].toString() == selectedFlat) ? selectedFlat : null,
+                            decoration: const InputDecoration(
                               labelText: "Flat",
-                              border:
-                                  OutlineInputBorder(),
+                              border: OutlineInputBorder(),
                             ),
-
                             items: flats.map((f) {
-                              return DropdownMenuItem<
-                                  String>(
-                                value: f["id"]
-                                    .toString(),
-                                child: Text(
-                                  f["flat_number"]
-                                      .toString(),
-                                ),
+                              return DropdownMenuItem<String>(
+                                value: f["id"].toString(),
+                                child: Text(f["flat_number"].toString()),
                               );
                             }).toList(),
-
                             onChanged: (value) {
-                              selectedFlat =
-                                  value;
-
+                              selectedFlat = value;
                               applyFilters();
                             },
                           ),
-                        ),
+                        );
 
-                        //////////////////////////////////
-                        /// RESET FILTER
-                        //////////////////////////////////
-
-                        ElevatedButton.icon(
+                        final resetBtn = ElevatedButton.icon(
                           onPressed: resetFilters,
-                          icon: const Icon(
-                            Icons.refresh,
-                          ),
-                          label:
-                              const Text("Reset"),
-                        ),
-                      ],
+                          icon: const Icon(Icons.refresh),
+                          label: const Text("Reset"),
+                        );
+
+                        if (isMobile) {
+                          return SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                buildingFilter,
+                                const SizedBox(width: 10),
+                                floorFilter,
+                                const SizedBox(width: 10),
+                                flatFilter,
+                                const SizedBox(width: 10),
+                                resetBtn,
+                              ],
+                            ),
+                          );
+                        } else {
+                          return Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              buildingFilter,
+                              floorFilter,
+                              flatFilter,
+                              resetBtn,
+                            ],
+                          );
+                        }
+                      }
                     ),
 
                     const SizedBox(height: 15),

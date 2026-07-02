@@ -700,14 +700,34 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
                   const SizedBox(height: 24),
                   
                   // Summary Badges
-                  Row(
-                    children: [
-                      _summaryCard("Vacant", vacantCount, Colors.green),
-                      const SizedBox(width: 12),
-                      _summaryCard("Partial", partialCount, Colors.orange),
-                      const SizedBox(width: 12),
-                      _summaryCard("Occupied", occupiedCount, Colors.red),
-                    ],
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = constraints.maxWidth < 600;
+                      if (isMobile) {
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _summaryCard("Vacant", vacantCount, Colors.green),
+                              const SizedBox(width: 12),
+                              _summaryCard("Partial", partialCount, Colors.orange),
+                              const SizedBox(width: 12),
+                              _summaryCard("Occupied", occupiedCount, Colors.red),
+                            ],
+                          ),
+                        );
+                      } else {
+                        return Row(
+                          children: [
+                            Expanded(child: _summaryCard("Vacant", vacantCount, Colors.green)),
+                            const SizedBox(width: 12),
+                            Expanded(child: _summaryCard("Partial", partialCount, Colors.orange)),
+                            const SizedBox(width: 12),
+                            Expanded(child: _summaryCard("Occupied", occupiedCount, Colors.red)),
+                          ],
+                        );
+                      }
+                    }
                   ),
                   const SizedBox(height: 24),
 
@@ -716,25 +736,57 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
                   const SizedBox(height: 20),
 
                   // Action + Results Grid
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        "${filtered.length} Rental Units Found",
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B)),
-                      ),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1E3A8A),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        ),
-                        onPressed: () => openDialog(),
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text("Add Rental Unit", style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                    ],
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = constraints.maxWidth < 600;
+                      if (isMobile) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "${filtered.length} Rental Units Found",
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B)),
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF1E3A8A),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                ),
+                                onPressed: () => openDialog(),
+                                icon: const Icon(Icons.add, size: 18),
+                                label: const Text("Add Rental Unit", style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ],
+                        );
+                      } else {
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "${filtered.length} Rental Units Found",
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B)),
+                            ),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF1E3A8A),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                ),
+                              onPressed: () => openDialog(),
+                              icon: const Icon(Icons.add, size: 18),
+                              label: const Text("Add Rental Unit", style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        );
+                      }
+                    }
                   ),
                   const SizedBox(height: 20),
 
@@ -768,7 +820,7 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
                                 crossAxisCount: crossAxisCount,
                                 mainAxisSpacing: 16,
                                 crossAxisSpacing: 16,
-                                childAspectRatio: 1.3,
+                                childAspectRatio: constraints.maxWidth < 650 ? 1.05 : 1.3,
                               ),
                               itemBuilder: (context, index) {
                                 return _unitCard(filtered[index]);
@@ -800,30 +852,30 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
   }
 
   Widget _summaryCard(String title, int count, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 6,
-              backgroundColor: color,
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                Text("$count units", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-              ],
-            ),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 6,
+            backgroundColor: color,
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              Text("$count units", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -905,142 +957,167 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
             const SizedBox(height: 12),
             LayoutBuilder(builder: (context, constraints) {
               final isWide = constraints.maxWidth > 800;
-              return Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  // Building dropdown
-                  SizedBox(
-                    width: isWide ? 180 : double.infinity,
-                    child: DropdownButtonFormField<String>(
-                      value: selectedBuildingId,
-                      decoration: const InputDecoration(labelText: "Building", border: OutlineInputBorder()),
-                      items: [
-                        const DropdownMenuItem(value: null, child: Text("All Buildings")),
-                        ...buildingMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
-                      ],
-                      onChanged: (val) {
-                        setState(() {
-                          selectedBuildingId = val;
-                          filterFloors = [];
-                        });
-                        if (val != null) {
-                          fetchFloorsForFilter(val);
-                        } else {
-                          setState(() {
-                            selectedFloorId = null;
-                            selectedFlatId = null;
-                            selectedRoomId = null;
-                          });
-                        }
-                      },
-                    ),
-                  ),
 
-                  // Floor dropdown
-                  SizedBox(
-                    width: isWide ? 180 : double.infinity,
-                    child: isFilterFloorsLoading
-                        ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
-                        : DropdownButtonFormField<String>(
-                            value: selectedFloorId,
-                            decoration: const InputDecoration(labelText: "Floor", border: OutlineInputBorder()),
-                            items: [
-                              const DropdownMenuItem(value: null, child: Text("All Floors")),
-                              ...filterFloors.map((f) {
-                                final dispName = f["floor_name"] != null && f["floor_name"].toString().isNotEmpty
-                                    ? f["floor_name"]
-                                    : "Floor ${f["floor_number"]}";
-                                return DropdownMenuItem(value: f["id"].toString(), child: Text(dispName.toString()));
-                              }),
-                            ],
-                            onChanged: (val) => setState(() {
-                              selectedFloorId = val;
-                              selectedFlatId = null;
-                              selectedRoomId = null;
-                            }),
-                          ),
-                  ),
-
-                  // Flat dropdown
-                  SizedBox(
-                    width: isWide ? 180 : double.infinity,
-                    child: DropdownButtonFormField<String>(
-                      value: selectedFlatId,
-                      decoration: const InputDecoration(labelText: "Flat", border: OutlineInputBorder()),
-                      items: [
-                        const DropdownMenuItem(value: null, child: Text("All Flats")),
-                        ...flatMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
-                      ],
-                      onChanged: (val) => setState(() {
-                        selectedFlatId = val;
+              final buildingDropdown = SizedBox(
+                width: 160,
+                child: DropdownButtonFormField<String>(
+                  value: selectedBuildingId,
+                  decoration: const InputDecoration(labelText: "Building", border: OutlineInputBorder()),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text("All Buildings")),
+                    ...buildingMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
+                  ],
+                  onChanged: (val) {
+                    setState(() {
+                      selectedBuildingId = val;
+                      filterFloors = [];
+                    });
+                    if (val != null) {
+                      fetchFloorsForFilter(val);
+                    } else {
+                      setState(() {
+                        selectedFloorId = null;
+                        selectedFlatId = null;
                         selectedRoomId = null;
-                      }),
-                    ),
-                  ),
-
-                  // Room dropdown
-                  SizedBox(
-                    width: isWide ? 180 : double.infinity,
-                    child: DropdownButtonFormField<String>(
-                      value: selectedRoomId,
-                      decoration: const InputDecoration(labelText: "Room", border: OutlineInputBorder()),
-                      items: [
-                        const DropdownMenuItem(value: null, child: Text("All Rooms")),
-                        ...roomMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
-                      ],
-                      onChanged: (val) => setState(() => selectedRoomId = val),
-                    ),
-                  ),
-
-                  // Status dropdown
-                  SizedBox(
-                    width: isWide ? 180 : double.infinity,
-                    child: DropdownButtonFormField<String>(
-                      value: selectedStatus,
-                      decoration: const InputDecoration(labelText: "Occupancy Status", border: OutlineInputBorder()),
-                      items: const [
-                        DropdownMenuItem(value: null, child: Text("All Status")),
-                        DropdownMenuItem(value: "vacant", child: Text("Vacant")),
-                        DropdownMenuItem(value: "partial", child: Text("Partial")),
-                        DropdownMenuItem(value: "occupied", child: Text("Occupied")),
-                      ],
-                      onChanged: (val) => setState(() => selectedStatus = val),
-                    ),
-                  ),
-
-                  // Occupancy Policy dropdown
-                  SizedBox(
-                    width: isWide ? 180 : double.infinity,
-                    child: DropdownButtonFormField<String>(
-                      value: filterOccupancyPolicy,
-                      decoration: const InputDecoration(labelText: "Occupancy Policy", border: OutlineInputBorder()),
-                      items: const [
-                        DropdownMenuItem(value: null, child: Text("All Policies")),
-                        DropdownMenuItem(value: "shared", child: Text("Shared Policy")),
-                        DropdownMenuItem(value: "exclusive", child: Text("Exclusive Policy")),
-                        DropdownMenuItem(value: "exclusive_occupied", child: Text("Exclusively Occupied")),
-                      ],
-                      onChanged: (val) => setState(() => filterOccupancyPolicy = val),
-                    ),
-                  ),
-
-                  // Sorting dropdown
-                  SizedBox(
-                    width: isWide ? 180 : double.infinity,
-                    child: DropdownButtonFormField<String>(
-                      value: selectedSort,
-                      decoration: const InputDecoration(labelText: "Sort By", border: OutlineInputBorder()),
-                      items: const [
-                        DropdownMenuItem(value: "recently_changed", child: Text("Recently Changed")),
-                        DropdownMenuItem(value: "newest", child: Text("Newest Added")),
-                        DropdownMenuItem(value: "oldest", child: Text("Oldest Added")),
-                      ],
-                      onChanged: (val) => setState(() => selectedSort = val!),
-                    ),
-                  ),
-                ],
+                      });
+                    }
+                  },
+                ),
               );
+
+              final floorDropdown = SizedBox(
+                width: 160,
+                child: isFilterFloorsLoading
+                    ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                    : DropdownButtonFormField<String>(
+                        value: selectedFloorId,
+                        decoration: const InputDecoration(labelText: "Floor", border: OutlineInputBorder()),
+                        items: [
+                          const DropdownMenuItem(value: null, child: Text("All Floors")),
+                          ...filterFloors.map((f) {
+                            final dispName = f["floor_name"] != null && f["floor_name"].toString().isNotEmpty
+                                ? f["floor_name"]
+                                : "Floor ${f["floor_number"]}";
+                            return DropdownMenuItem(value: f["id"].toString(), child: Text(dispName.toString()));
+                          }),
+                        ],
+                        onChanged: (val) => setState(() {
+                          selectedFloorId = val;
+                          selectedFlatId = null;
+                          selectedRoomId = null;
+                        }),
+                      ),
+              );
+
+              final flatDropdown = SizedBox(
+                width: 160,
+                child: DropdownButtonFormField<String>(
+                  value: selectedFlatId,
+                  decoration: const InputDecoration(labelText: "Flat", border: OutlineInputBorder()),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text("All Flats")),
+                    ...flatMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
+                  ],
+                  onChanged: (val) => setState(() {
+                    selectedFlatId = val;
+                    selectedRoomId = null;
+                  }),
+                ),
+              );
+
+              final roomDropdown = SizedBox(
+                width: 160,
+                child: DropdownButtonFormField<String>(
+                  value: selectedRoomId,
+                  decoration: const InputDecoration(labelText: "Room", border: OutlineInputBorder()),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text("All Rooms")),
+                    ...roomMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
+                  ],
+                  onChanged: (val) => setState(() => selectedRoomId = val),
+                ),
+              );
+
+              final statusDropdown = SizedBox(
+                width: 160,
+                child: DropdownButtonFormField<String>(
+                  value: selectedStatus,
+                  decoration: const InputDecoration(labelText: "Occupancy Status", border: OutlineInputBorder()),
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text("All Status")),
+                    DropdownMenuItem(value: "vacant", child: Text("Vacant")),
+                    DropdownMenuItem(value: "partial", child: Text("Partial")),
+                    DropdownMenuItem(value: "occupied", child: Text("Occupied")),
+                  ],
+                  onChanged: (val) => setState(() => selectedStatus = val),
+                ),
+              );
+
+              final policyDropdown = SizedBox(
+                width: 160,
+                child: DropdownButtonFormField<String>(
+                  value: filterOccupancyPolicy,
+                  decoration: const InputDecoration(labelText: "Occupancy Policy", border: OutlineInputBorder()),
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text("All Policies")),
+                    DropdownMenuItem(value: "shared", child: Text("Shared Policy")),
+                    DropdownMenuItem(value: "exclusive", child: Text("Exclusive Policy")),
+                    DropdownMenuItem(value: "exclusive_occupied", child: Text("Exclusively Occupied")),
+                  ],
+                  onChanged: (val) => setState(() => filterOccupancyPolicy = val),
+                ),
+              );
+
+              final sortDropdown = SizedBox(
+                width: 160,
+                child: DropdownButtonFormField<String>(
+                  value: selectedSort,
+                  decoration: const InputDecoration(labelText: "Sort By", border: OutlineInputBorder()),
+                  items: const [
+                    DropdownMenuItem(value: "recently_changed", child: Text("Recently Changed")),
+                    DropdownMenuItem(value: "newest", child: Text("Newest Added")),
+                    DropdownMenuItem(value: "oldest", child: Text("Oldest Added")),
+                  ],
+                  onChanged: (val) => setState(() => selectedSort = val!),
+                ),
+              );
+
+              if (isWide) {
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    buildingDropdown,
+                    floorDropdown,
+                    flatDropdown,
+                    roomDropdown,
+                    statusDropdown,
+                    policyDropdown,
+                    sortDropdown,
+                  ],
+                );
+              } else {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      buildingDropdown,
+                      const SizedBox(width: 10),
+                      floorDropdown,
+                      const SizedBox(width: 10),
+                      flatDropdown,
+                      const SizedBox(width: 10),
+                      roomDropdown,
+                      const SizedBox(width: 10),
+                      statusDropdown,
+                      const SizedBox(width: 10),
+                      policyDropdown,
+                      const SizedBox(width: 10),
+                      sortDropdown,
+                    ],
+                  ),
+                );
+              }
             }),
           ],
         ],

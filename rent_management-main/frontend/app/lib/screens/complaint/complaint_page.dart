@@ -323,22 +323,50 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   color: Colors.deepPurple,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Complaints",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                        ),
-                      ),
-
-                      ElevatedButton(
-                        onPressed: () => openDialog(),
-                        child: const Text("New Complaint"),
-                      )
-                    ],
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = constraints.maxWidth < 600;
+                      if (isMobile) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Complaints",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: () => openDialog(),
+                                child: const Text("New Complaint"),
+                              ),
+                            )
+                          ],
+                        );
+                      } else {
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              "Complaints",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => openDialog(),
+                              child: const Text("New Complaint"),
+                            )
+                          ],
+                        );
+                      }
+                    }
                   ),
                 ),
 

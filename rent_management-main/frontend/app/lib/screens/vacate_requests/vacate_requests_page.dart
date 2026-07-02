@@ -138,17 +138,18 @@ class _VacatePipelinePageState
           Row(
             mainAxisAlignment:
                 MainAxisAlignment.spaceBetween,
-
             children: [
-
-              Text(
-                "Tenant: ${n['tenant']}",
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Text(
+                  "Tenant: ${n['tenant']}",
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-
+              const SizedBox(width: 8),
               _statusBadge(n["status"]),
             ],
           ),
@@ -184,22 +185,19 @@ class _VacatePipelinePageState
           /// ACTIONS (ROLE BASED)
           //////////////////////////////////////////////////////
 
-          Row(
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
             children: [
-
               ////////////////////////////////////////////////////
               /// OWNER ACTIONS
               ////////////////////////////////////////////////////
-
               if (widget.role == "owner" && isPending) ...[
                 ElevatedButton.icon(
                   onPressed: () => approve(n["id"]),
                   icon: const Icon(Icons.check),
                   label: const Text("Approve"),
                 ),
-
-                const SizedBox(width: 10),
-
                 OutlinedButton.icon(
                   onPressed: () => reject(n["id"]),
                   icon: const Icon(Icons.close),
@@ -210,7 +208,6 @@ class _VacatePipelinePageState
               ////////////////////////////////////////////////////
               /// FINAL CHECKOUT
               ////////////////////////////////////////////////////
-
               if (widget.role == "owner" && isApproved) ...[
                 ElevatedButton.icon(
                   onPressed: () => complete(n["id"]),

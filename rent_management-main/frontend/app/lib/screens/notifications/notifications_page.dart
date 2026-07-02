@@ -261,15 +261,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         ],
                       ),
                     ),
-                    child: Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isMobile = constraints.maxWidth < 600;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               "Notifications",
                               style: TextStyle(
                                 color: Colors.white,
@@ -277,34 +275,37 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            Text(
+                            const Text(
                               "System alerts & updates",
-                              style: TextStyle(
-                                  color: Colors.white70),
+                              style: TextStyle(color: Colors.white70),
                             ),
+                            if (isMobile) const SizedBox(height: 16),
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: [
+                                if (widget.role == "owner")
+                                  SizedBox(
+                                    width: isMobile ? double.infinity : null,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () => openForm(bulk: true),
+                                      icon: const Icon(Icons.campaign),
+                                      label: const Text("Broadcast"),
+                                    ),
+                                  ),
+                                SizedBox(
+                                  width: isMobile ? double.infinity : null,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () => openForm(),
+                                    icon: const Icon(Icons.send),
+                                    label: const Text("Send"),
+                                  ),
+                                ),
+                              ],
+                            )
                           ],
-                        ),
-
-                        Row(
-                          children: [
-
-                            if (widget.role == "owner")
-                              ElevatedButton.icon(
-                                onPressed: () => openForm(bulk: true),
-                                icon: const Icon(Icons.campaign),
-                                label: const Text("Broadcast"),
-                              ),
-
-                            const SizedBox(width: 10),
-
-                            ElevatedButton.icon(
-                              onPressed: () => openForm(),
-                              icon: const Icon(Icons.send),
-                              label: const Text("Send"),
-                            ),
-                          ],
-                        )
-                      ],
+                        );
+                      }
                     ),
                   ),
 

@@ -349,7 +349,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildMetricsGrid(double screenWidth) {
     if (widget.role == "tenant") {
       int crossAxisCount = screenWidth < 600 ? 1 : 3;
-      double aspectRatio = screenWidth < 600 ? 3.0 : 1.8;
+      double aspectRatio = screenWidth < 600 ? 2.0 : 1.8;
 
       final rent = dashboardData?["rent"] ?? "0";
       final unitType = dashboardData?["unit_type"] ?? "N/A";
@@ -413,7 +413,7 @@ class _DashboardPageState extends State<DashboardPage> {
       final occupancyRate = totalUnits > 0 ? (occupied / totalUnits) : 0.0;
 
       int crossAxisCount = screenWidth < 700 ? 1 : (screenWidth < 1100 ? 2 : 3);
-      double aspectRatio = screenWidth < 700 ? 3.0 : 1.7;
+      double aspectRatio = screenWidth < 700 ? 2.0 : 1.7;
 
       return Column(
         children: [

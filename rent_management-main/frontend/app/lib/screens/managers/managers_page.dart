@@ -413,7 +413,7 @@ class _ManagersPageState extends State<ManagersPage> {
                                 crossAxisCount: isMobile ? 1 : 2,
                                 crossAxisSpacing: 20,
                                 mainAxisSpacing: 20,
-                                childAspectRatio: isMobile ? 2.2 : 1.8,
+                                childAspectRatio: isMobile ? 1.4 : 1.8,
                               ),
                               itemBuilder: (context, index) {
                                 final manager = managers[index];

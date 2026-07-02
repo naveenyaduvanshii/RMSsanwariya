@@ -94,13 +94,15 @@ class _TenantsPageState extends State<TenantsPage> {
       context: context,
       builder: (_) => AlertDialog(
         title: Text(tenant == null ? "Add Tenant" : "Edit Tenant"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameController, decoration: const InputDecoration(labelText: "Name")),
-            TextField(controller: phoneController, decoration: const InputDecoration(labelText: "Phone")),
-            TextField(controller: emailController, decoration: const InputDecoration(labelText: "Email")),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: nameController, decoration: const InputDecoration(labelText: "Name")),
+              TextField(controller: phoneController, decoration: const InputDecoration(labelText: "Phone")),
+              TextField(controller: emailController, decoration: const InputDecoration(labelText: "Email")),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -152,27 +154,57 @@ class _TenantsPageState extends State<TenantsPage> {
           const SizedBox(height: 10),
 
           // SEARCH + ADD
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: searchController,
-                  onChanged: filterTenants,
-                  decoration: const InputDecoration(
-                    hintText: "Search tenants...",
-                    prefixIcon: Icon(Icons.search),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 10),
-
-              if (widget.role == "owner" || widget.role == "manager")
-                ElevatedButton(
-                  onPressed: () => openTenantForm(),
-                  child: const Text("Add Tenant"),
-                )
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = constraints.maxWidth < 600;
+              if (isMobile) {
+                return Column(
+                  children: [
+                    TextField(
+                      controller: searchController,
+                      onChanged: filterTenants,
+                      decoration: const InputDecoration(
+                        hintText: "Search tenants...",
+                        prefixIcon: Icon(Icons.search),
+                      ),
+                    ),
+                    if (widget.role == "owner" || widget.role == "manager") ...[
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => openTenantForm(),
+                          icon: const Icon(Icons.add),
+                          label: const Text("Add Tenant"),
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              } else {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: searchController,
+                        onChanged: filterTenants,
+                        decoration: const InputDecoration(
+                          hintText: "Search tenants...",
+                          prefixIcon: Icon(Icons.search),
+                        ),
+                      ),
+                    ),
+                    if (widget.role == "owner" || widget.role == "manager") ...[
+                      const SizedBox(width: 10),
+                      ElevatedButton(
+                        onPressed: () => openTenantForm(),
+                        child: const Text("Add Tenant"),
+                      ),
+                    ],
+                  ],
+                );
+              }
+            }
           ),
 
           const SizedBox(height: 10),

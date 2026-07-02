@@ -328,22 +328,50 @@ class _MaintenancePageState extends State<MaintenancePage> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   color: Colors.teal,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Maintenance System",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                        ),
-                      ),
-
-                      ElevatedButton(
-                        onPressed: () => openDialog(),
-                        child: const Text("New Request"),
-                      )
-                    ],
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = constraints.maxWidth < 600;
+                      if (isMobile) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Maintenance System",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: () => openDialog(),
+                                child: const Text("New Request"),
+                              ),
+                            )
+                          ],
+                        );
+                      } else {
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              "Maintenance System",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => openDialog(),
+                              child: const Text("New Request"),
+                            )
+                          ],
+                        );
+                      }
+                    }
                   ),
                 ),
 

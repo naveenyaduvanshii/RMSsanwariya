@@ -230,15 +230,13 @@ class _DocumentsPageState extends State<DocumentsPage> {
                         ],
                       ),
                     ),
-                    child: Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isMobile = constraints.maxWidth < 600;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               "Documents",
                               style: TextStyle(
                                 color: Colors.white,
@@ -246,19 +244,22 @@ class _DocumentsPageState extends State<DocumentsPage> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            Text(
+                            const Text(
                               "Tenant & Rental documents management",
-                              style: TextStyle(
-                                  color: Colors.white70),
+                              style: TextStyle(color: Colors.white70),
                             ),
+                            if (isMobile) const SizedBox(height: 16),
+                            SizedBox(
+                              width: isMobile ? double.infinity : null,
+                              child: ElevatedButton.icon(
+                                onPressed: () => openForm(),
+                                icon: const Icon(Icons.upload_file),
+                                label: const Text("Add Document"),
+                              ),
+                            )
                           ],
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: () => openForm(),
-                          icon: const Icon(Icons.upload_file),
-                          label: const Text("Add Document"),
-                        )
-                      ],
+                        );
+                      }
                     ),
                   ),
 

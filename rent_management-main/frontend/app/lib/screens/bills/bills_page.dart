@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import '../../layout/main_layout.dart';
-import 'dart:html' as html;
 
 class BillsPage extends StatefulWidget {
   final String role;
@@ -450,7 +450,86 @@ class _BillsPageState extends State<BillsPage> {
 
   void downloadPdfReport() {
     final String url = "$baseUrl/api/bills/report/pdf/?search=$searchQuery&status=$statusFilter&building=${selectedBuilding ?? ''}&floor=${selectedFloor ?? ''}&aging=$overdueFilter&month=${selectedMonth ?? ''}";
-    html.window.open(url, "_blank");
+    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  Widget _buildReportOptionsButton(BuildContext context, {required bool isFullWidth}) {
+    return PopupMenuButton<String>(
+      tooltip: "Report Options",
+      onSelected: (value) {
+        if (value == 'download') {
+          downloadPdfReport();
+        } else if (value == 'print') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Opening print preview...")),
+          );
+          downloadPdfReport();
+        } else if (value == 'whatsapp') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("WhatsApp integration will be added later.")),
+          );
+        }
+      },
+      itemBuilder: (BuildContext context) => [
+        const PopupMenuItem<String>(
+          value: 'download',
+          child: Row(
+            children: [
+              Icon(Icons.download, color: Colors.blue),
+              SizedBox(width: 10),
+              Text("Download PDF"),
+            ],
+          ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'print',
+          child: Row(
+            children: [
+              Icon(Icons.print, color: Colors.indigo),
+              SizedBox(width: 10),
+              Text("Print"),
+            ],
+          ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'whatsapp',
+          child: Row(
+            children: [
+              Icon(Icons.chat, color: Colors.green),
+              SizedBox(width: 10),
+              Text("WhatsApp"),
+            ],
+          ),
+        ),
+      ],
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Ink(
+          width: isFullWidth ? double.infinity : null,
+          decoration: BoxDecoration(
+            color: Colors.blueAccent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.picture_as_pdf, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text(
+                  "Report Options",
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                SizedBox(width: 4),
+                Icon(Icons.arrow_drop_down, color: Colors.white, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -495,83 +574,125 @@ class _BillsPageState extends State<BillsPage> {
       currentIndex: 9,
       child: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
+          : SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // PAGE TITLE
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Rent Manager",
-                        style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                      ),
-                      Row(
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: downloadPdfReport,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blueAccent,
-                              foregroundColor: Colors.white,
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = constraints.maxWidth < 600;
+                      if (isMobile) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Rent Manager",
+                              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                             ),
-                            icon: const Icon(Icons.download, size: 16),
-                            label: const Text("Download PDF"),
-                          ),
-                          if (widget.role != "tenant") ...[
-                            const SizedBox(width: 10),
-                            ElevatedButton.icon(
-                              onPressed: openBillGenerationDialog,
-                              icon: const Icon(Icons.add),
-                              label: const Text("Generate Rent Bill"),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildReportOptionsButton(context, isFullWidth: true),
+                                ),
+                                if (widget.role != "tenant") ...[
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: openBillGenerationDialog,
+                                      icon: const Icon(Icons.add),
+                                      label: const Text("Generate Rent Bill"),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ],
-                        ],
-                      ),
-                    ],
+                        );
+                      } else {
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              "Rent Manager",
+                              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            ),
+                            Row(
+                              children: [
+                                _buildReportOptionsButton(context, isFullWidth: false),
+                                if (widget.role != "tenant") ...[
+                                  const SizedBox(width: 10),
+                                  ElevatedButton.icon(
+                                    onPressed: openBillGenerationDialog,
+                                    icon: const Icon(Icons.add),
+                                    label: const Text("Generate Rent Bill"),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        );
+                      }
+                    }
                   ),
                   const SizedBox(height: 15),
 
                   // SUMMARY METRICS CARDS
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Card(
-                          color: Colors.green.shade50,
-                          child: Padding(
-                            padding: const EdgeInsets.all(15.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text("COLLECTED RENT", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
-                                const SizedBox(height: 6),
-                                Text("₹${totalRentCollected.toStringAsFixed(1)}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green.shade900)),
-                                const SizedBox(height: 4),
-                                Text("Cash: ₹${totalRentCollectedCash.toStringAsFixed(1)}", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green.shade700)),
-                              ],
-                            ),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = constraints.maxWidth < 600;
+                      final collectedCard = Card(
+                        color: Colors.green.shade50,
+                        child: Padding(
+                          padding: const EdgeInsets.all(15.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text("COLLECTED RENT", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
+                              const SizedBox(height: 6),
+                              Text("₹${totalRentCollected.toStringAsFixed(1)}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green.shade900)),
+                              const SizedBox(height: 4),
+                              Text("Cash: ₹${totalRentCollectedCash.toStringAsFixed(1)}", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green.shade700)),
+                            ],
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 15),
-                      Expanded(
-                        child: Card(
-                          color: Colors.orange.shade50,
-                          child: Padding(
-                            padding: const EdgeInsets.all(15.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text("PENDING RENT", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange.shade800)),
-                                const SizedBox(height: 6),
-                                Text("₹${totalRentPending.toStringAsFixed(1)}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.orange.shade900)),
-                              ],
-                            ),
+                      );
+
+                      final pendingCard = Card(
+                        color: Colors.orange.shade50,
+                        child: Padding(
+                          padding: const EdgeInsets.all(15.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text("PENDING RENT", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange.shade800)),
+                              const SizedBox(height: 6),
+                              Text("₹${totalRentPending.toStringAsFixed(1)}", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.orange.shade900)),
+                            ],
                           ),
                         ),
-                      ),
-                    ],
+                      );
+
+                      if (isMobile) {
+                        return Column(
+                          children: [
+                            SizedBox(width: double.infinity, child: collectedCard),
+                            const SizedBox(height: 10),
+                            SizedBox(width: double.infinity, child: pendingCard),
+                          ],
+                        );
+                      } else {
+                        return Row(
+                          children: [
+                            Expanded(child: collectedCard),
+                            const SizedBox(width: 15),
+                            Expanded(child: pendingCard),
+                          ],
+                        );
+                      }
+                    }
                   ),
                   const SizedBox(height: 15),
 
@@ -599,102 +720,199 @@ class _BillsPageState extends State<BillsPage> {
                         const SizedBox(height: 12),
 
                         // Filter selectors (Building, Floor, Status, Overdue Aging)
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 10,
-                          children: [
-                            // Status Chips
-                            ChoiceChip(
-                              label: const Text("All Bills"),
-                              selected: statusFilter == "all",
-                              onSelected: (s) => setState(() {
-                                statusFilter = "all";
-                                overdueFilter = "all";
-                              }),
-                            ),
-                            ChoiceChip(
-                              label: const Text("Paid"),
-                              selected: statusFilter == "paid",
-                              onSelected: (s) => setState(() {
-                                statusFilter = "paid";
-                                overdueFilter = "all";
-                              }),
-                            ),
-                            ChoiceChip(
-                              label: const Text("Unpaid"),
-                              selected: statusFilter == "unpaid",
-                              onSelected: (s) => setState(() => statusFilter = "unpaid"),
-                            ),
-
-                            // Month Dropdown
-                            DropdownButton<String>(
-                              hint: const Text("Month"),
-                              value: selectedMonth,
-                              underline: const SizedBox(),
-                              items: [
-                                const DropdownMenuItem(value: null, child: Text("All Months")),
-                                ...monthsSet.map((m) {
-                                  final year = m.substring(0, 4);
-                                  final monthNum = int.parse(m.substring(5, 7));
-                                  final monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                                  final name = "${monthNames[monthNum]} $year";
-                                  return DropdownMenuItem(value: m, child: Text(name));
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final isMobile = constraints.maxWidth < 600;
+                            final filtersList = [
+                              ChoiceChip(
+                                label: const Text("All Bills"),
+                                selected: statusFilter == "all",
+                                onSelected: (s) => setState(() {
+                                  statusFilter = "all";
+                                  overdueFilter = "all";
                                 }),
-                              ],
-                              onChanged: (v) => setState(() => selectedMonth = v),
-                            ),
-
-                            // Building Dropdown
-                            DropdownButton<String>(
-                              hint: const Text("Building"),
-                              value: selectedBuilding,
-                              underline: const SizedBox(),
-                              items: [
-                                const DropdownMenuItem(value: null, child: Text("All Buildings")),
-                                ...buildingsSet.map((b) => DropdownMenuItem(value: b, child: Text(b))),
-                              ],
-                              onChanged: (v) => setState(() => selectedBuilding = v),
-                            ),
-
-                            // Floor Dropdown
-                            DropdownButton<String>(
-                              hint: const Text("Floor"),
-                              value: selectedFloor,
-                              underline: const SizedBox(),
-                              items: [
-                                const DropdownMenuItem(value: null, child: Text("All Floors")),
-                                ...floorsSet.map((f) => DropdownMenuItem(value: f, child: Text("Floor $f"))),
-                              ],
-                              onChanged: (v) => setState(() => selectedFloor = v),
-                            ),
-
-                            // Aging Dropdown (only for Unpaid / All)
-                            if (statusFilter != "paid")
+                              ),
+                              const SizedBox(width: 8),
+                              ChoiceChip(
+                                label: const Text("Paid"),
+                                selected: statusFilter == "paid",
+                                onSelected: (s) => setState(() {
+                                  statusFilter = "paid";
+                                  overdueFilter = "all";
+                                }),
+                              ),
+                              const SizedBox(width: 8),
+                              ChoiceChip(
+                                label: const Text("Unpaid"),
+                                selected: statusFilter == "unpaid",
+                                onSelected: (s) => setState(() => statusFilter = "unpaid"),
+                              ),
+                              const SizedBox(width: 12),
                               DropdownButton<String>(
-                                value: overdueFilter,
+                                hint: const Text("Month"),
+                                value: selectedMonth,
+                                underline: const SizedBox(),
+                                items: [
+                                  const DropdownMenuItem(value: null, child: Text("All Months")),
+                                  ...monthsSet.map((m) {
+                                    final year = m.substring(0, 4);
+                                    final monthNum = int.parse(m.substring(5, 7));
+                                    final monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                                    final name = "${monthNames[monthNum]} $year";
+                                    return DropdownMenuItem(value: m, child: Text(name));
+                                  }),
+                                ],
+                                onChanged: (v) => setState(() => selectedMonth = v),
+                              ),
+                              const SizedBox(width: 12),
+                              DropdownButton<String>(
+                                hint: const Text("Building"),
+                                value: selectedBuilding,
+                                underline: const SizedBox(),
+                                items: [
+                                  const DropdownMenuItem(value: null, child: Text("All Buildings")),
+                                  ...buildingsSet.map((b) => DropdownMenuItem(value: b, child: Text(b))),
+                                ],
+                                onChanged: (v) => setState(() => selectedBuilding = v),
+                              ),
+                              const SizedBox(width: 12),
+                              DropdownButton<String>(
+                                hint: const Text("Floor"),
+                                value: selectedFloor,
+                                underline: const SizedBox(),
+                                items: [
+                                  const DropdownMenuItem(value: null, child: Text("All Floors")),
+                                  ...floorsSet.map((f) => DropdownMenuItem(value: f, child: Text("Floor $f"))),
+                                ],
+                                onChanged: (v) => setState(() => selectedFloor = v),
+                              ),
+                              if (statusFilter != "paid") ...[
+                                const SizedBox(width: 12),
+                                DropdownButton<String>(
+                                  value: overdueFilter,
+                                  underline: const SizedBox(),
+                                  items: const [
+                                    DropdownMenuItem(value: "all", child: Text("All Aging")),
+                                    DropdownMenuItem(value: "overdue", child: Text("Past Due Date")),
+                                    DropdownMenuItem(value: "1month", child: Text("> 1 Month")),
+                                    DropdownMenuItem(value: "2months", child: Text("> 2 Months")),
+                                    DropdownMenuItem(value: "3months", child: Text("> 3 Months")),
+                                  ],
+                                  onChanged: (v) => setState(() => overdueFilter = v ?? "all"),
+                                ),
+                              ],
+                              const SizedBox(width: 12),
+                              DropdownButton<String>(
+                                value: sortBy,
                                 underline: const SizedBox(),
                                 items: const [
-                                  DropdownMenuItem(value: "all", child: Text("All Aging")),
-                                  DropdownMenuItem(value: "overdue", child: Text("Past Due Date")),
-                                  DropdownMenuItem(value: "1month", child: Text("> 1 Month")),
-                                  DropdownMenuItem(value: "2months", child: Text("> 2 Months")),
-                                  DropdownMenuItem(value: "3months", child: Text("> 3 Months")),
+                                  DropdownMenuItem(value: "month_desc", child: Text("Newest Month First")),
+                                  DropdownMenuItem(value: "month_asc", child: Text("Oldest Month First")),
+                                  DropdownMenuItem(value: "unpaid_first", child: Text("Unpaid Bills First")),
+                                  DropdownMenuItem(value: "paid_first", child: Text("Paid Bills First")),
                                 ],
-                                onChanged: (v) => setState(() => overdueFilter = v ?? "all"),
+                                onChanged: (v) => setState(() => sortBy = v ?? "month_desc"),
                               ),
-                            // Sort Dropdown
-                            DropdownButton<String>(
-                              value: sortBy,
-                              underline: const SizedBox(),
-                              items: const [
-                                DropdownMenuItem(value: "month_desc", child: Text("Newest Month First")),
-                                DropdownMenuItem(value: "month_asc", child: Text("Oldest Month First")),
-                                DropdownMenuItem(value: "unpaid_first", child: Text("Unpaid Bills First")),
-                                DropdownMenuItem(value: "paid_first", child: Text("Paid Bills First")),
-                              ],
-                              onChanged: (v) => setState(() => sortBy = v ?? "month_desc"),
-                            ),
-                          ],
+                            ];
+
+                            if (isMobile) {
+                              return SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: filtersList,
+                                ),
+                              );
+                            } else {
+                              return Wrap(
+                                spacing: 12,
+                                runSpacing: 10,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  ChoiceChip(
+                                    label: const Text("All Bills"),
+                                    selected: statusFilter == "all",
+                                    onSelected: (s) => setState(() {
+                                      statusFilter = "all";
+                                      overdueFilter = "all";
+                                    }),
+                                  ),
+                                  ChoiceChip(
+                                    label: const Text("Paid"),
+                                    selected: statusFilter == "paid",
+                                    onSelected: (s) => setState(() {
+                                      statusFilter = "paid";
+                                      overdueFilter = "all";
+                                    }),
+                                  ),
+                                  ChoiceChip(
+                                    label: const Text("Unpaid"),
+                                    selected: statusFilter == "unpaid",
+                                    onSelected: (s) => setState(() => statusFilter = "unpaid"),
+                                  ),
+                                  DropdownButton<String>(
+                                    hint: const Text("Month"),
+                                    value: selectedMonth,
+                                    underline: const SizedBox(),
+                                    items: [
+                                      const DropdownMenuItem(value: null, child: Text("All Months")),
+                                      ...monthsSet.map((m) {
+                                        final year = m.substring(0, 4);
+                                        final monthNum = int.parse(m.substring(5, 7));
+                                        final monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                                        final name = "${monthNames[monthNum]} $year";
+                                        return DropdownMenuItem(value: m, child: Text(name));
+                                      }),
+                                    ],
+                                    onChanged: (v) => setState(() => selectedMonth = v),
+                                  ),
+                                  DropdownButton<String>(
+                                    hint: const Text("Building"),
+                                    value: selectedBuilding,
+                                    underline: const SizedBox(),
+                                    items: [
+                                      const DropdownMenuItem(value: null, child: Text("All Buildings")),
+                                      ...buildingsSet.map((b) => DropdownMenuItem(value: b, child: Text(b))),
+                                    ],
+                                    onChanged: (v) => setState(() => selectedBuilding = v),
+                                  ),
+                                  DropdownButton<String>(
+                                    hint: const Text("Floor"),
+                                    value: selectedFloor,
+                                    underline: const SizedBox(),
+                                    items: [
+                                      const DropdownMenuItem(value: null, child: Text("All Floors")),
+                                      ...floorsSet.map((f) => DropdownMenuItem(value: f, child: Text("Floor $f"))),
+                                    ],
+                                    onChanged: (v) => setState(() => selectedFloor = v),
+                                  ),
+                                  if (statusFilter != "paid")
+                                    DropdownButton<String>(
+                                      value: overdueFilter,
+                                      underline: const SizedBox(),
+                                      items: const [
+                                        DropdownMenuItem(value: "all", child: Text("All Aging")),
+                                        DropdownMenuItem(value: "overdue", child: Text("Past Due Date")),
+                                        DropdownMenuItem(value: "1month", child: Text("> 1 Month")),
+                                        DropdownMenuItem(value: "2months", child: Text("> 2 Months")),
+                                        DropdownMenuItem(value: "3months", child: Text("> 3 Months")),
+                                      ],
+                                      onChanged: (v) => setState(() => overdueFilter = v ?? "all"),
+                                    ),
+                                  DropdownButton<String>(
+                                    value: sortBy,
+                                    underline: const SizedBox(),
+                                    items: const [
+                                      DropdownMenuItem(value: "month_desc", child: Text("Newest Month First")),
+                                      DropdownMenuItem(value: "month_asc", child: Text("Oldest Month First")),
+                                      DropdownMenuItem(value: "unpaid_first", child: Text("Unpaid Bills First")),
+                                      DropdownMenuItem(value: "paid_first", child: Text("Paid Bills First")),
+                                    ],
+                                    onChanged: (v) => setState(() => sortBy = v ?? "month_desc"),
+                                  ),
+                                ],
+                              );
+                            }
+                          }
                         ),
                       ],
                     ),
@@ -702,12 +920,13 @@ class _BillsPageState extends State<BillsPage> {
                   const SizedBox(height: 15),
 
                   // BILL LIST
-                  Expanded(
-                    child: filteredList.isEmpty
-                        ? const Center(child: Text("No matching bills found."))
-                        : ListView.builder(
-                            itemCount: filteredList.length,
-                            itemBuilder: (context, idx) {
+                  filteredList.isEmpty
+                      ? const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text("No matching bills found.")))
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: filteredList.length,
+                          itemBuilder: (context, idx) {
                               final b = filteredList[idx];
                               final isPaid = b["status"] == "paid";
 
@@ -827,15 +1046,16 @@ class _BillsPageState extends State<BillsPage> {
                                         ),
                                       ] else if (widget.role != "tenant") ...[
                                         const SizedBox(height: 10),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.end,
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          alignment: WrapAlignment.end,
                                           children: [
                                             TextButton.icon(
                                               onPressed: () => openSurchargeDialog(b["id"]),
                                               icon: const Icon(Icons.add_circle_outline, size: 16),
                                               label: const Text("Apply Charge/Fine"),
                                             ),
-                                            const SizedBox(width: 10),
                                             ElevatedButton.icon(
                                               onPressed: () => openRecordPaymentDialog(b),
                                               style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
@@ -851,7 +1071,6 @@ class _BillsPageState extends State<BillsPage> {
                               );
                             },
                           ),
-                  ),
                 ],
               ),
             ),

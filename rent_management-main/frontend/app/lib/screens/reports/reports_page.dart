@@ -148,7 +148,7 @@ class _ReportsPageState extends State<ReportsPage> {
                         physics: const NeverScrollableScrollPhysics(),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: isMobile ? 1 : 2,
-                          childAspectRatio: isMobile ? 2.5 : 1.8,
+                          childAspectRatio: isMobile ? 2.0 : 1.8,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                         ),

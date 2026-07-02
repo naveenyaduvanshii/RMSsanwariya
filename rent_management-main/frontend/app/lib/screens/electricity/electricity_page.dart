@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:html' as html;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../layout/main_layout.dart';
 
@@ -83,7 +83,86 @@ class _ElectricityPageState extends State<ElectricityPage> {
         "flat=${filterFlat ?? ''}&"
         "room=${filterRoom ?? ''}&"
         "month=${filterMonth ?? ''}";
-    html.window.open(url, "_blank");
+    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  Widget _buildReportOptionsButton(BuildContext context, {required bool isFullWidth}) {
+    return PopupMenuButton<String>(
+      tooltip: "Report Options",
+      onSelected: (value) {
+        if (value == 'download') {
+          downloadPdfReport();
+        } else if (value == 'print') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Opening print preview...")),
+          );
+          downloadPdfReport();
+        } else if (value == 'whatsapp') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("WhatsApp integration will be added later.")),
+          );
+        }
+      },
+      itemBuilder: (BuildContext context) => [
+        const PopupMenuItem<String>(
+          value: 'download',
+          child: Row(
+            children: [
+              Icon(Icons.download, color: Colors.blue),
+              SizedBox(width: 10),
+              Text("Download PDF"),
+            ],
+          ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'print',
+          child: Row(
+            children: [
+              Icon(Icons.print, color: Colors.indigo),
+              SizedBox(width: 10),
+              Text("Print"),
+            ],
+          ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'whatsapp',
+          child: Row(
+            children: [
+              Icon(Icons.chat, color: Colors.green),
+              SizedBox(width: 10),
+              Text("WhatsApp"),
+            ],
+          ),
+        ),
+      ],
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Ink(
+          width: isFullWidth ? double.infinity : null,
+          decoration: BoxDecoration(
+            color: Colors.blueAccent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.picture_as_pdf, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text(
+                  "Report Options",
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                SizedBox(width: 4),
+                Icon(Icons.arrow_drop_down, color: Colors.white, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   // ---------------- FETCH ROOMS ----------------
@@ -393,16 +472,16 @@ class _ElectricityPageState extends State<ElectricityPage> {
       currentIndex: 11,
       child: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
+          : SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
                   // HEADER CARD & ACTIONS
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = constraints.maxWidth < 600;
+                      if (isMobile) {
+                        return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
@@ -414,31 +493,63 @@ class _ElectricityPageState extends State<ElectricityPage> {
                               "Track meter changes and consumption rates",
                               style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
                             ),
-                          ],
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: downloadPdfReport,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blueAccent,
-                              foregroundColor: Colors.white,
-                            ),
-                            icon: const Icon(Icons.download, size: 16),
-                            label: const Text("Download PDF"),
-                          ),
-                          if (widget.role != "tenant") ...[
-                            const SizedBox(width: 10),
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.add),
-                              label: const Text("Log Meter Entry"),
-                              onPressed: () => openForm(),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildReportOptionsButton(context, isFullWidth: true),
+                                ),
+                                if (widget.role != "tenant") ...[
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      icon: const Icon(Icons.add),
+                                      label: const Text("Log Meter Entry"),
+                                      onPressed: () => openForm(),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ],
-                        ],
-                      ),
-                    ],
+                        );
+                      } else {
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Electricity Meter Ledger",
+                                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Track meter changes and consumption rates",
+                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                _buildReportOptionsButton(context, isFullWidth: false),
+                                if (widget.role != "tenant") ...[
+                                  const SizedBox(width: 10),
+                                  ElevatedButton.icon(
+                                    icon: const Icon(Icons.add),
+                                    label: const Text("Log Meter Entry"),
+                                    onPressed: () => openForm(),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        );
+                      }
+                    }
                   ),
                   const SizedBox(height: 15),
 
@@ -451,105 +562,199 @@ class _ElectricityPageState extends State<ElectricityPage> {
                       borderRadius: BorderRadius.circular(15),
                       boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)],
                     ),
-                    child: Wrap(
-                      spacing: 12,
-                      runSpacing: 10,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        // Month Dropdown
-                        DropdownButton<String>(
-                          hint: const Text("Month"),
-                          value: filterMonth,
-                          underline: const SizedBox(),
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text("All Months")),
-                            ...monthsSet.map((m) {
-                              final year = m.substring(0, 4);
-                              final monthNum = int.parse(m.substring(5, 7));
-                              final monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                              final name = "${monthNames[monthNum]} $year";
-                              return DropdownMenuItem(value: m, child: Text(name));
-                            }),
-                          ],
-                          onChanged: (v) => setState(() => filterMonth = v),
-                        ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isMobile = constraints.maxWidth < 600;
 
-                        // Building Dropdown
-                        DropdownButton<String>(
-                          hint: const Text("Building"),
-                          value: filterBuilding,
-                          underline: const SizedBox(),
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text("All Buildings")),
-                            ...buildingsSet.map((b) => DropdownMenuItem(value: b, child: Text(b))),
-                          ],
-                          onChanged: (v) => setState(() => filterBuilding = v),
-                        ),
+                        final clearFiltersButton = (filterBuilding != null || filterFloor != null || filterFlat != null || filterRoom != null || filterMonth != null)
+                            ? TextButton.icon(
+                                icon: const Icon(Icons.clear_all, size: 16),
+                                label: const Text("Reset Filters"),
+                                onPressed: () {
+                                  setState(() {
+                                    filterBuilding = null;
+                                    filterFloor = null;
+                                    filterFlat = null;
+                                    filterRoom = null;
+                                    filterMonth = null;
+                                  });
+                                },
+                              )
+                            : const SizedBox();
 
-                        // Floor Dropdown
-                        DropdownButton<String>(
-                          hint: const Text("Floor"),
-                          value: filterFloor,
-                          underline: const SizedBox(),
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text("All Floors")),
-                            ...floorsSet.map((f) => DropdownMenuItem(value: f, child: Text("Floor $f"))),
-                          ],
-                          onChanged: (v) => setState(() => filterFloor = v),
-                        ),
-
-                        // Flat Dropdown
-                        DropdownButton<String>(
-                          hint: const Text("Flat"),
-                          value: filterFlat,
-                          underline: const SizedBox(),
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text("All Flats")),
-                            ...flatsSet.map((fl) => DropdownMenuItem(value: fl, child: Text("Flat $fl"))),
-                          ],
-                          onChanged: (v) => setState(() => filterFlat = v),
-                        ),
-
-                        // Room Dropdown
-                        DropdownButton<String>(
-                          hint: const Text("Room"),
-                          value: filterRoom,
-                          underline: const SizedBox(),
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text("All Rooms")),
-                            ...roomsSet.map((r) => DropdownMenuItem(value: r, child: Text("Room $r"))),
-                          ],
-                          onChanged: (v) => setState(() => filterRoom = v),
-                        ),
-
-                        // Clear filters button
-                        if (filterBuilding != null || filterFloor != null || filterFlat != null || filterRoom != null || filterMonth != null)
-                          TextButton.icon(
-                            icon: const Icon(Icons.clear_all, size: 16),
-                            label: const Text("Reset Filters"),
-                            onPressed: () {
-                              setState(() {
-                                filterBuilding = null;
-                                filterFloor = null;
-                                filterFlat = null;
-                                filterRoom = null;
-                                filterMonth = null;
-                              });
-                            },
+                        final buildingDropdown = SizedBox(
+                          width: 150,
+                          child: DropdownButtonFormField<String>(
+                            value: filterBuilding,
+                            decoration: const InputDecoration(labelText: "Building", border: OutlineInputBorder()),
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text("All Buildings")),
+                              ...buildingsSet.map((b) => DropdownMenuItem(value: b, child: Text(b))),
+                            ],
+                            onChanged: (v) => setState(() => filterBuilding = v),
                           ),
-                      ],
+                        );
+
+                        final floorDropdown = SizedBox(
+                          width: 150,
+                          child: DropdownButtonFormField<String>(
+                            value: filterFloor,
+                            decoration: const InputDecoration(labelText: "Floor", border: OutlineInputBorder()),
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text("All Floors")),
+                              ...floorsSet.map((f) => DropdownMenuItem(value: f, child: Text("Floor $f"))),
+                            ],
+                            onChanged: (v) => setState(() => filterFloor = v),
+                          ),
+                        );
+
+                        final flatDropdown = SizedBox(
+                          width: 150,
+                          child: DropdownButtonFormField<String>(
+                            value: filterFlat,
+                            decoration: const InputDecoration(labelText: "Flat", border: OutlineInputBorder()),
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text("All Flats")),
+                              ...flatsSet.map((fl) => DropdownMenuItem(value: fl, child: Text("Flat $fl"))),
+                            ],
+                            onChanged: (v) => setState(() => filterFlat = v),
+                          ),
+                        );
+
+                        final roomDropdown = SizedBox(
+                          width: 150,
+                          child: DropdownButtonFormField<String>(
+                            value: filterRoom,
+                            decoration: const InputDecoration(labelText: "Room", border: OutlineInputBorder()),
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text("All Rooms")),
+                              ...roomsSet.map((r) => DropdownMenuItem(value: r, child: Text("Room $r"))),
+                            ],
+                            onChanged: (v) => setState(() => filterRoom = v),
+                          ),
+                        );
+
+                        final monthDropdown = SizedBox(
+                          width: 150,
+                          child: DropdownButtonFormField<String>(
+                            value: filterMonth,
+                            decoration: const InputDecoration(labelText: "Month", border: OutlineInputBorder()),
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text("All Months")),
+                              ...monthsSet.map((m) {
+                                final year = m.substring(0, 4);
+                                final monthNum = int.parse(m.substring(5, 7));
+                                final monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                                final name = "${monthNames[monthNum]} $year";
+                                return DropdownMenuItem(value: m, child: Text(name));
+                              }),
+                            ],
+                            onChanged: (v) => setState(() => filterMonth = v),
+                          ),
+                        );
+
+                        if (isMobile) {
+                          return SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                monthDropdown,
+                                const SizedBox(width: 10),
+                                buildingDropdown,
+                                const SizedBox(width: 10),
+                                floorDropdown,
+                                const SizedBox(width: 10),
+                                flatDropdown,
+                                const SizedBox(width: 10),
+                                roomDropdown,
+                                if (filterBuilding != null || filterFloor != null || filterFlat != null || filterRoom != null || filterMonth != null) ...[
+                                  const SizedBox(width: 10),
+                                  clearFiltersButton,
+                                ],
+                              ],
+                            ),
+                          );
+                        } else {
+                          return Wrap(
+                            spacing: 12,
+                            runSpacing: 10,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              DropdownButton<String>(
+                                hint: const Text("Month"),
+                                value: filterMonth,
+                                underline: const SizedBox(),
+                                items: [
+                                  const DropdownMenuItem(value: null, child: Text("All Months")),
+                                  ...monthsSet.map((m) {
+                                    final year = m.substring(0, 4);
+                                    final monthNum = int.parse(m.substring(5, 7));
+                                    final monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                                    final name = "${monthNames[monthNum]} $year";
+                                    return DropdownMenuItem(value: m, child: Text(name));
+                                  }),
+                                ],
+                                onChanged: (v) => setState(() => filterMonth = v),
+                              ),
+                              DropdownButton<String>(
+                                hint: const Text("Building"),
+                                value: filterBuilding,
+                                underline: const SizedBox(),
+                                items: [
+                                  const DropdownMenuItem(value: null, child: Text("All Buildings")),
+                                  ...buildingsSet.map((b) => DropdownMenuItem(value: b, child: Text(b))),
+                                ],
+                                onChanged: (v) => setState(() => filterBuilding = v),
+                              ),
+                              DropdownButton<String>(
+                                hint: const Text("Floor"),
+                                value: filterFloor,
+                                underline: const SizedBox(),
+                                items: [
+                                  const DropdownMenuItem(value: null, child: Text("All Floors")),
+                                  ...floorsSet.map((f) => DropdownMenuItem(value: f, child: Text("Floor $f"))),
+                                ],
+                                onChanged: (v) => setState(() => filterFloor = v),
+                              ),
+                              DropdownButton<String>(
+                                hint: const Text("Flat"),
+                                value: filterFlat,
+                                underline: const SizedBox(),
+                                items: [
+                                  const DropdownMenuItem(value: null, child: Text("All Flats")),
+                                  ...flatsSet.map((fl) => DropdownMenuItem(value: fl, child: Text("Flat $fl"))),
+                                ],
+                                onChanged: (v) => setState(() => filterFlat = v),
+                              ),
+                              DropdownButton<String>(
+                                hint: const Text("Room"),
+                                value: filterRoom,
+                                underline: const SizedBox(),
+                                items: [
+                                  const DropdownMenuItem(value: null, child: Text("All Rooms")),
+                                  ...roomsSet.map((r) => DropdownMenuItem(value: r, child: Text("Room $r"))),
+                                ],
+                                onChanged: (v) => setState(() => filterRoom = v),
+                              ),
+                              if (filterBuilding != null || filterFloor != null || filterFlat != null || filterRoom != null || filterMonth != null)
+                                clearFiltersButton,
+                            ],
+                          );
+                        }
+                      }
                     ),
                   ),
                   const SizedBox(height: 15),
 
                   // SCROLLABLE LEDGER DATA OVERVIEW
-                  Expanded(
-                    child: filteredReadings.isEmpty
-                        ? const Center(child: Text("No electricity history matches selected filters."))
-                        : ListView.builder(
-                            itemCount: filteredReadings.length,
-                            itemBuilder: (context, index) {
-                              final r = filteredReadings[index];
+                  filteredReadings.isEmpty
+                      ? const Center(child: Padding(padding: EdgeInsets.all(40.0), child: Text("No electricity history matches selected filters.")))
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: filteredReadings.length,
+                          itemBuilder: (context, index) {
+                            final r = filteredReadings[index];
 
                               double prev = (r["previous_reading"] ?? 0.0).toDouble();
                               double curr = (r["current_reading"] ?? 0.0).toDouble();
@@ -606,10 +811,8 @@ class _ElectricityPageState extends State<ElectricityPage> {
                                     ],
                                   ),
                                 ),
-                              );
                             },
                           ),
-                  )
                 ],
               ),
             ),

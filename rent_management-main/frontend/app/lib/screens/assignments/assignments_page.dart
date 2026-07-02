@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'dart:html' as html;
+import 'package:url_launcher/url_launcher.dart';
 import '../../layout/main_layout.dart';
 import '../../services/api_service.dart';
 
@@ -234,7 +234,86 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
         "&status=${Uri.encodeComponent(status)}"
         "&sort=${Uri.encodeComponent(sort)}";
 
-    html.window.open(url, "_blank");
+    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  Widget _buildReportOptionsButton(BuildContext context, {required bool isFullWidth}) {
+    return PopupMenuButton<String>(
+      tooltip: "Report Options",
+      onSelected: (value) {
+        if (value == 'download') {
+          downloadPdf();
+        } else if (value == 'print') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Opening print preview...")),
+          );
+          downloadPdf();
+        } else if (value == 'whatsapp') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("WhatsApp integration will be added later.")),
+          );
+        }
+      },
+      itemBuilder: (BuildContext context) => [
+        const PopupMenuItem<String>(
+          value: 'download',
+          child: Row(
+            children: [
+              Icon(Icons.download, color: Colors.blue),
+              SizedBox(width: 10),
+              Text("Download PDF"),
+            ],
+          ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'print',
+          child: Row(
+            children: [
+              Icon(Icons.print, color: Colors.indigo),
+              SizedBox(width: 10),
+              Text("Print"),
+            ],
+          ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'whatsapp',
+          child: Row(
+            children: [
+              Icon(Icons.chat, color: Colors.green),
+              SizedBox(width: 10),
+              Text("WhatsApp"),
+            ],
+          ),
+        ),
+      ],
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Ink(
+          width: isFullWidth ? double.infinity : null,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.picture_as_pdf, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text(
+                  "Report Options",
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                SizedBox(width: 4),
+                Icon(Icons.arrow_drop_down, color: Colors.white, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   bool validateForm() {
@@ -780,8 +859,9 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
             children: [
               _buildInfoColumn("Rent", "₹${assignment["final_rent"]}"),
               _buildInfoColumn("Deposit", "₹${assignment["security_deposit"]}"),
@@ -899,34 +979,71 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
   }
 
   Widget _buildHeaderSection() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Tenant Assignments",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              "${assignments.length} assignments registered",
-              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-            ),
-          ],
-        ),
-        if (widget.role == "owner" || widget.role == "manager")
-          ElevatedButton.icon(
-            onPressed: () => showAssignmentDialog(),
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text("Assign Tenant"),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = MediaQuery.of(context).size.width < 600;
+        if (isMobile) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Tenant Assignments",
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "${assignments.length} assignments registered",
+                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              ),
+              if (widget.role == "owner" || widget.role == "manager") ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => showAssignmentDialog(),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text("Assign Tenant"),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          );
+        } else {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Tenant Assignments",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "${assignments.length} assignments registered",
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+              if (widget.role == "owner" || widget.role == "manager")
+                ElevatedButton.icon(
+                  onPressed: () => showAssignmentDialog(),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text("Assign Tenant"),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+            ],
+          );
+        }
+      }
     );
   }
 
@@ -1060,22 +1177,37 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
       ],
     );
 
-    final actionButtonsWidget = Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        TextButton.icon(
-          onPressed: resetFilters,
-          icon: const Icon(Icons.refresh),
-          label: const Text("Reset Filters"),
-        ),
-        const SizedBox(width: 10),
-        ElevatedButton.icon(
-          onPressed: downloadPdf,
-          icon: const Icon(Icons.picture_as_pdf),
-          label: const Text("Download PDF"),
-          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A)),
-        ),
-      ],
+    final actionButtonsWidget = LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = MediaQuery.of(context).size.width < 600;
+        if (isMobile) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextButton.icon(
+                onPressed: resetFilters,
+                icon: const Icon(Icons.refresh),
+                label: const Text("Reset Filters"),
+              ),
+              const SizedBox(height: 8),
+              _buildReportOptionsButton(context, isFullWidth: true),
+            ],
+          );
+        } else {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton.icon(
+                onPressed: resetFilters,
+                icon: const Icon(Icons.refresh),
+                label: const Text("Reset Filters"),
+              ),
+              const SizedBox(width: 10),
+              _buildReportOptionsButton(context, isFullWidth: false),
+            ],
+          );
+        }
+      }
     );
 
     return Container(
@@ -1108,17 +1240,24 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
               ],
             ),
           ] else ...[
-            buildingFilterWidget,
-            const SizedBox(height: 10),
-            floorFilterWidget,
-            const SizedBox(height: 10),
-            roomFilterWidget,
-            const SizedBox(height: 10),
-            statusFilterWidget,
-            const SizedBox(height: 10),
-            sortFilterWidget,
-            const SizedBox(height: 10),
-            rentRangeWidget,
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  SizedBox(width: 150, child: buildingFilterWidget),
+                  const SizedBox(width: 10),
+                  SizedBox(width: 150, child: floorFilterWidget),
+                  const SizedBox(width: 10),
+                  SizedBox(width: 150, child: roomFilterWidget),
+                  const SizedBox(width: 10),
+                  SizedBox(width: 150, child: statusFilterWidget),
+                  const SizedBox(width: 10),
+                  SizedBox(width: 150, child: sortFilterWidget),
+                  const SizedBox(width: 10),
+                  SizedBox(width: 180, child: rentRangeWidget),
+                ],
+              ),
+            ),
           ],
           const SizedBox(height: 16),
           const Divider(),

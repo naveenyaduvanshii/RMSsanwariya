@@ -184,14 +184,16 @@ class _BuildingsPageState extends State<BuildingsPage> {
       context: context,
       builder: (_) => AlertDialog(
         title: Text(isEdit ? "Edit Building" : "Add Building"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            buildField("Building Name", nameController),
-            buildField("Address", addressController),
-            buildField("City", cityController),
-            buildField("Floors", floorsController),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              buildField("Building Name", nameController),
+              buildField("Address", addressController),
+              buildField("City", cityController),
+              buildField("Floors", floorsController),
+            ],
+          ),
         ),
         actions: [
           TextButton(

@@ -193,22 +193,22 @@ class _PaymentsPageState extends State<PaymentsPage> {
                         const SizedBox(height: 12),
 
                         // Mode Chips Filter
-                        Row(
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 8,
                           children: [
                             const Text("Payment Mode: ", style: TextStyle(fontWeight: FontWeight.bold)),
-                            const SizedBox(width: 8),
                             ChoiceChip(
                               label: const Text("All"),
                               selected: paymentModeFilter == "all",
                               onSelected: (s) => setState(() => paymentModeFilter = "all"),
                             ),
-                            const SizedBox(width: 8),
                             ChoiceChip(
                               label: const Text("Cash"),
                               selected: paymentModeFilter == "cash",
                               onSelected: (s) => setState(() => paymentModeFilter = "cash"),
                             ),
-                            const SizedBox(width: 8),
                             ChoiceChip(
                               label: const Text("UPI / Online"),
                               selected: paymentModeFilter == "upi",

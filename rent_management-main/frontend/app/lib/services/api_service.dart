@@ -4,8 +4,8 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
 
-  // ✅ YOUR PC WIFI IP
-  static const String localIp = "http://192.168.29.108:8000";
+  // ✅ YOUR PC WIFI IP (Uses ADB reverse mapping for USB debugging)
+  static const String localIp = "http://127.0.0.1:8000";
 
   // 🌐 BASE URL
   static String get baseUrl {
