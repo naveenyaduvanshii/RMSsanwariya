@@ -216,8 +216,8 @@ class _FlatsPageState extends State<FlatsPage> {
           builder: (context, setDialogState) {
             return AlertDialog(
               title: Text(flat == null ? "Add Flat" : "Update Flat"),
-              content: SizedBox(
-                width: 400,
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
                 child: SingleChildScrollView(
                   child: Column(
                     children: [

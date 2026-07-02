@@ -110,7 +110,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 child: FadeTransition(
                   opacity: animationController,
                   child: Container(
-                    width: 430,
+                    constraints: const BoxConstraints(maxWidth: 430),
                     padding: const EdgeInsets.all(32),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.08),

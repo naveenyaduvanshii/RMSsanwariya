@@ -229,7 +229,7 @@ class _ManagersPageState extends State<ManagersPage> {
         return Dialog(
           backgroundColor: Colors.transparent,
           child: Container(
-            width: 500,
+            constraints: const BoxConstraints(maxWidth: 500),
             padding: const EdgeInsets.all(25),
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30)),
             child: SingleChildScrollView(
@@ -310,7 +310,7 @@ class _ManagersPageState extends State<ManagersPage> {
     return Dialog(
       backgroundColor: Colors.transparent,
       child: Container(
-        width: 500,
+        constraints: const BoxConstraints(maxWidth: 500),
         padding: const EdgeInsets.all(25),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(30),

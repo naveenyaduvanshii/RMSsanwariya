@@ -417,6 +417,15 @@ class RentalUnit(models.Model):
         default=False
     )
 
+    occupancy_type = models.CharField(
+        max_length=20,
+        choices=(
+            ("shared", "Shared"),
+            ("exclusive", "Exclusive"),
+        ),
+        default="shared"
+    )
+
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
@@ -425,6 +434,18 @@ class RentalUnit(models.Model):
 
     created_at = models.DateTimeField(
         auto_now_add=True
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True
+    )
+
+    exclusive_tenant = models.ForeignKey(
+        'Users',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='exclusive_rented_units'
     )
 
     class Meta:
@@ -1182,3 +1203,95 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.module} - {self.action}"
+
+
+# =====================================================
+# SIGNALS FOR AUTOMATIC RENTAL UNIT MANAGEMENT
+# =====================================================
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+@receiver(post_save, sender=Flat)
+def auto_create_flat_rental_unit(sender, instance, created, **kwargs):
+    if created:
+        RentalUnit.objects.get_or_create(
+            unit_type="flat",
+            flat=instance,
+            defaults={
+                "building": instance.building,
+                "floor": instance.floor,
+                "rent": instance.base_rent,
+                "capacity": instance.capacity,
+                "allow_sharing": instance.allow_sharing,
+                "status": instance.status,
+                "occupied_count": instance.occupied_count,
+            }
+        )
+    else:
+        # Sync updates
+        RentalUnit.objects.filter(unit_type="flat", flat=instance).update(
+            building=instance.building,
+            floor=instance.floor,
+            rent=instance.base_rent,
+            capacity=instance.capacity,
+            allow_sharing=instance.allow_sharing,
+            status=instance.status,
+            occupied_count=instance.occupied_count,
+        )
+
+@receiver(post_save, sender=Room)
+def auto_manage_room_and_flat_rental_units(sender, instance, created, **kwargs):
+    if instance.flat:
+        # Delete flat rental unit if it exists
+        flat_ru = RentalUnit.objects.filter(unit_type="flat", flat=instance.flat).first()
+        if flat_ru:
+            flat_ru.delete()
+            
+            # Ensure all rooms in this flat have a RentalUnit
+            sibling_rooms = Room.objects.filter(flat=instance.flat)
+            for rm in sibling_rooms:
+                RentalUnit.objects.get_or_create(
+                    unit_type="room",
+                    room=rm,
+                    defaults={
+                        "building": rm.building,
+                        "floor": rm.floor,
+                        "flat": instance.flat,
+                        "rent": rm.base_rent,
+                        "capacity": rm.capacity,
+                        "allow_sharing": rm.allow_sharing,
+                        "status": rm.status,
+                        "occupied_count": rm.occupied_count,
+                    }
+                )
+            return
+
+    # If it is a new room or the flat didn't have a whole-flat unit, ensure room has a RentalUnit
+    if created:
+        RentalUnit.objects.get_or_create(
+            unit_type="room",
+            room=instance,
+            defaults={
+                "building": instance.building,
+                "floor": instance.floor,
+                "flat": instance.flat,
+                "rent": instance.base_rent,
+                "capacity": instance.capacity,
+                "allow_sharing": instance.allow_sharing,
+                "status": instance.status,
+                "occupied_count": instance.occupied_count,
+            }
+        )
+    else:
+        # Update existing room rental unit details
+        RentalUnit.objects.filter(unit_type="room", room=instance).update(
+            building=instance.building,
+            floor=instance.floor,
+            flat=instance.flat,
+            rent=instance.base_rent,
+            capacity=instance.capacity,
+            allow_sharing=instance.allow_sharing,
+            status=instance.status,
+            occupied_count=instance.occupied_count,
+        )

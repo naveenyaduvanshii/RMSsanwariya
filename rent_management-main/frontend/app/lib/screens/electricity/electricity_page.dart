@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'dart:html' as html;
 
 import '../../layout/main_layout.dart';
 
@@ -34,6 +35,13 @@ class _ElectricityPageState extends State<ElectricityPage> {
 
   String editId = "";
 
+  // Filters State
+  String? filterBuilding;
+  String? filterFloor;
+  String? filterFlat;
+  String? filterRoom;
+  String? filterMonth;
+
   final TextEditingController previousController = TextEditingController();
   final TextEditingController currentController = TextEditingController();
   final TextEditingController rateController = TextEditingController();
@@ -44,6 +52,38 @@ class _ElectricityPageState extends State<ElectricityPage> {
     super.initState();
     fetchReadings();
     fetchRooms();
+  }
+
+  List getFilteredReadings() {
+    return readings.where((r) {
+      if (filterBuilding != null && r["building_name"] != filterBuilding) {
+        return false;
+      }
+      if (filterFloor != null && r["floor_number"]?.toString() != filterFloor) {
+        return false;
+      }
+      if (filterFlat != null && r["flat_number"]?.toString() != filterFlat) {
+        return false;
+      }
+      if (filterRoom != null && r["room_number"]?.toString() != filterRoom) {
+        return false;
+      }
+      if (filterMonth != null) {
+        final mStr = r["reading_month"].toString().substring(0, 7);
+        if (mStr != filterMonth) return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  void downloadPdfReport() {
+    final String url = "$baseUrl/api/electricity/report/pdf/?"
+        "building=${filterBuilding ?? ''}&"
+        "floor=${filterFloor ?? ''}&"
+        "flat=${filterFlat ?? ''}&"
+        "room=${filterRoom ?? ''}&"
+        "month=${filterMonth ?? ''}";
+    html.window.open(url, "_blank");
   }
 
   // ---------------- FETCH ROOMS ----------------
@@ -320,6 +360,32 @@ class _ElectricityPageState extends State<ElectricityPage> {
   // ---------------- UI VIEW BUILDER ----------------
   @override
   Widget build(BuildContext context) {
+    // Dynamic list extraction for filters
+    final Set<String> buildingsSet = {};
+    final Set<String> floorsSet = {};
+    final Set<String> flatsSet = {};
+    final Set<String> roomsSet = {};
+    final Set<String> monthsSet = {};
+    for (var r in readings) {
+      if (r["building_name"] != null && r["building_name"].toString().isNotEmpty) {
+        buildingsSet.add(r["building_name"]);
+      }
+      if (r["floor_number"] != null) {
+        floorsSet.add(r["floor_number"].toString());
+      }
+      if (r["flat_number"] != null && r["flat_number"].toString().isNotEmpty) {
+        flatsSet.add(r["flat_number"].toString());
+      }
+      if (r["room_number"] != null && r["room_number"].toString().isNotEmpty) {
+        roomsSet.add(r["room_number"].toString());
+      }
+      if (r["reading_month"] != null && r["reading_month"].toString().isNotEmpty) {
+        monthsSet.add(r["reading_month"].toString().substring(0, 7));
+      }
+    }
+
+    final filteredReadings = getFilteredReadings();
+
     return MainLayout(
       role: widget.role,
       userName: widget.userName,
@@ -331,56 +397,176 @@ class _ElectricityPageState extends State<ElectricityPage> {
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
-                  // HEADER CARD
-                  Card(
-                    color: Colors.blue.shade700,
-                    elevation: 4,
-                    child: const ListTile(
-                      title: Text(
-                        "Electricity Consumption Master Ledger",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                  // HEADER CARD & ACTIONS
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Electricity Meter Ledger",
+                              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "Track meter changes and consumption rates",
+                              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                            ),
+                          ],
                         ),
                       ),
-                      subtitle: Text(
-                        "Track dynamic meter changes and sub-unit consumption rates",
-                        style: TextStyle(color: Colors.white70),
+                      Row(
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: downloadPdfReport,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blueAccent,
+                              foregroundColor: Colors.white,
+                            ),
+                            icon: const Icon(Icons.download, size: 16),
+                            label: const Text("Download PDF"),
+                          ),
+                          if (widget.role != "tenant") ...[
+                            const SizedBox(width: 10),
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.add),
+                              label: const Text("Log Meter Entry"),
+                              onPressed: () => openForm(),
+                            ),
+                          ],
+                        ],
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+
+                  // FILTERS CONTROLLER ACCORDION / BOX
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)],
+                    ),
+                    child: Wrap(
+                      spacing: 12,
+                      runSpacing: 10,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        // Month Dropdown
+                        DropdownButton<String>(
+                          hint: const Text("Month"),
+                          value: filterMonth,
+                          underline: const SizedBox(),
+                          items: [
+                            const DropdownMenuItem(value: null, child: Text("All Months")),
+                            ...monthsSet.map((m) {
+                              final year = m.substring(0, 4);
+                              final monthNum = int.parse(m.substring(5, 7));
+                              final monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                              final name = "${monthNames[monthNum]} $year";
+                              return DropdownMenuItem(value: m, child: Text(name));
+                            }),
+                          ],
+                          onChanged: (v) => setState(() => filterMonth = v),
+                        ),
+
+                        // Building Dropdown
+                        DropdownButton<String>(
+                          hint: const Text("Building"),
+                          value: filterBuilding,
+                          underline: const SizedBox(),
+                          items: [
+                            const DropdownMenuItem(value: null, child: Text("All Buildings")),
+                            ...buildingsSet.map((b) => DropdownMenuItem(value: b, child: Text(b))),
+                          ],
+                          onChanged: (v) => setState(() => filterBuilding = v),
+                        ),
+
+                        // Floor Dropdown
+                        DropdownButton<String>(
+                          hint: const Text("Floor"),
+                          value: filterFloor,
+                          underline: const SizedBox(),
+                          items: [
+                            const DropdownMenuItem(value: null, child: Text("All Floors")),
+                            ...floorsSet.map((f) => DropdownMenuItem(value: f, child: Text("Floor $f"))),
+                          ],
+                          onChanged: (v) => setState(() => filterFloor = v),
+                        ),
+
+                        // Flat Dropdown
+                        DropdownButton<String>(
+                          hint: const Text("Flat"),
+                          value: filterFlat,
+                          underline: const SizedBox(),
+                          items: [
+                            const DropdownMenuItem(value: null, child: Text("All Flats")),
+                            ...flatsSet.map((fl) => DropdownMenuItem(value: fl, child: Text("Flat $fl"))),
+                          ],
+                          onChanged: (v) => setState(() => filterFlat = v),
+                        ),
+
+                        // Room Dropdown
+                        DropdownButton<String>(
+                          hint: const Text("Room"),
+                          value: filterRoom,
+                          underline: const SizedBox(),
+                          items: [
+                            const DropdownMenuItem(value: null, child: Text("All Rooms")),
+                            ...roomsSet.map((r) => DropdownMenuItem(value: r, child: Text("Room $r"))),
+                          ],
+                          onChanged: (v) => setState(() => filterRoom = v),
+                        ),
+
+                        // Clear filters button
+                        if (filterBuilding != null || filterFloor != null || filterFlat != null || filterRoom != null || filterMonth != null)
+                          TextButton.icon(
+                            icon: const Icon(Icons.clear_all, size: 16),
+                            label: const Text("Reset Filters"),
+                            onPressed: () {
+                              setState(() {
+                                filterBuilding = null;
+                                filterFloor = null;
+                                filterFlat = null;
+                                filterRoom = null;
+                                filterMonth = null;
+                              });
+                            },
+                          ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 15),
 
-                  // CONTROL ACTION SUB-BAR
-                  if (widget.role != "tenant")
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.add),
-                        label: const Text("Log Fresh Meter Entry"),
-                        onPressed: () => openForm(),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 15),
-
                   // SCROLLABLE LEDGER DATA OVERVIEW
                   Expanded(
-                    child: readings.isEmpty
-                        ? const Center(child: Text("No electricity history logged for this account."))
+                    child: filteredReadings.isEmpty
+                        ? const Center(child: Text("No electricity history matches selected filters."))
                         : ListView.builder(
-                            itemCount: readings.length,
+                            itemCount: filteredReadings.length,
                             itemBuilder: (context, index) {
-                              final r = readings[index];
+                              final r = filteredReadings[index];
 
                               double prev = (r["previous_reading"] ?? 0.0).toDouble();
                               double curr = (r["current_reading"] ?? 0.0).toDouble();
                               double rate = (r["unit_rate"] ?? 0.0).toDouble();
                               double netUnits = curr - prev;
                               double calculatedInvoiceBill = netUnits * rate;
+
+                              String buildingDetail = "";
+                              if (r["building_name"] != null && r["building_name"].toString().isNotEmpty) {
+                                buildingDetail += r["building_name"];
+                              }
+                              if (r["floor_number"] != null) {
+                                buildingDetail += ", Floor ${r["floor_number"]}";
+                              }
+                              if (r["flat_number"] != null && r["flat_number"].toString().isNotEmpty) {
+                                buildingDetail += ", Flat ${r["flat_number"]}";
+                              }
 
                               return Card(
                                 margin: const EdgeInsets.symmetric(vertical: 6),
@@ -391,11 +577,11 @@ class _ElectricityPageState extends State<ElectricityPage> {
                                     child: Icon(Icons.flash_on, color: Colors.amber.shade800),
                                   ),
                                   title: Text(
-                                    "Room ${r["room_number"] ?? 'N/A'}",
+                                    "Room ${r["room_number"] ?? 'N/A'}${buildingDetail.isNotEmpty ? ' ($buildingDetail)' : ''}",
                                     style: const TextStyle(fontWeight: FontWeight.bold),
                                   ),
                                   subtitle: Padding(
-                                    padding: const EdgeInsets.only(top: 4.0), // ✅ Fixed constructor name bug here
+                                    padding: const EdgeInsets.only(top: 4.0),
                                     child: Text(
                                       "Cycle Month: ${r["reading_month"] ?? 'N/A'}\n"
                                       "Units Consumed: ${netUnits.toStringAsFixed(1)} kWh (${prev.toStringAsFixed(0)} ➔ ${curr.toStringAsFixed(0)})\n"

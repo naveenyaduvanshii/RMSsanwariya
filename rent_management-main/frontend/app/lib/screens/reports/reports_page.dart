@@ -140,54 +140,57 @@ class _ReportsPageState extends State<ReportsPage> {
                   //////////////////////////////////////////////////
                   /// KPI CARDS
                   //////////////////////////////////////////////////
-                  GridView(
-                    shrinkWrap: true,
-                    physics:
-                        const NeverScrollableScrollPhysics(),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 1.8,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                    ),
-                    children: [
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final bool isMobile = constraints.maxWidth < 600;
+                      return GridView(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: isMobile ? 1 : 2,
+                          childAspectRatio: isMobile ? 2.5 : 1.8,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                        ),
+                        children: [
 
-                      _buildCard(
-                        "Total Tenants",
-                        summary["totalTenants"].toString(),
-                        Icons.people,
-                        Colors.blue,
-                      ),
+                          _buildCard(
+                            "Total Tenants",
+                            summary["totalTenants"].toString(),
+                            Icons.people,
+                            Colors.blue,
+                          ),
 
-                      _buildCard(
-                        "Total Revenue",
-                        "₹${summary["totalRevenue"]}",
-                        Icons.currency_rupee,
-                        Colors.green,
-                      ),
+                          _buildCard(
+                            "Total Revenue",
+                            "₹${summary["totalRevenue"]}",
+                            Icons.currency_rupee,
+                            Colors.green,
+                          ),
 
-                      _buildCard(
-                        "Pending Bills",
-                        summary["pendingBills"].toString(),
-                        Icons.receipt_long,
-                        Colors.orange,
-                      ),
+                          _buildCard(
+                            "Pending Bills",
+                            summary["pendingBills"].toString(),
+                            Icons.receipt_long,
+                            Colors.orange,
+                          ),
 
-                      _buildCard(
-                        "Vacated Rooms",
-                        summary["vacatedRooms"].toString(),
-                        Icons.exit_to_app,
-                        Colors.red,
-                      ),
+                          _buildCard(
+                            "Vacated Rooms",
+                            summary["vacatedRooms"].toString(),
+                            Icons.exit_to_app,
+                            Colors.red,
+                          ),
 
-                      _buildCard(
-                        "Active Complaints",
-                        summary["activeComplaints"].toString(),
-                        Icons.report_problem,
-                        Colors.purple,
-                      ),
-                    ],
+                          _buildCard(
+                            "Active Complaints",
+                            summary["activeComplaints"].toString(),
+                            Icons.report_problem,
+                            Colors.purple,
+                          ),
+                        ],
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 25),

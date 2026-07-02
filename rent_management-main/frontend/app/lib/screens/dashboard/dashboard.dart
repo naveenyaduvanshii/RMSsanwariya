@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../services/api_service.dart';
@@ -29,7 +28,13 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
-    loadDashboard();
+    if (widget.renterId.trim().isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacementNamed(context, '/login');
+      });
+    } else {
+      loadDashboard();
+    }
   }
 
   @override
@@ -72,23 +77,33 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  String _getFormattedDate() {
+    final now = DateTime.now();
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final weekdays = [
+      'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
+    ];
+    return "${weekdays[now.weekday % 7]}, ${months[now.month - 1]} ${now.day}, ${now.year}";
+  }
+
+  void _navigateTo(String route) {
+    Navigator.pushReplacementNamed(
+      context,
+      route,
+      arguments: {
+        "role": widget.role,
+        "userName": widget.userName,
+        "renterId": widget.renterId,
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
-
-    int crossAxisCount = 4;
-    double childAspectRatio = 1.7;
-
-    if (screenWidth < 600) {
-      crossAxisCount = 1;
-      childAspectRatio = 3.2;
-    } else if (screenWidth < 1100) {
-      crossAxisCount = 2;
-      childAspectRatio = 2.0;
-    } else if (screenWidth < 1400) {
-      crossAxisCount = 3;
-      childAspectRatio = 1.8;
-    }
 
     return MainLayout(
       role: widget.role,
@@ -100,367 +115,906 @@ class _DashboardPageState extends State<DashboardPage> {
           : dashboardData == null
               ? const Center(child: Text("No Data Found"))
               : SelectionArea(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        /// =======================================================
-                        /// STATS GRID (COLLAPSES SAFELY BASED ON VIEWPORT WIDTH)
-                        /// =======================================================
-                        GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: buildStatsCards().length,
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: crossAxisCount,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                            childAspectRatio: childAspectRatio,
+                  child: RefreshIndicator(
+                    onRefresh: loadDashboard,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildHeader(),
+                          const SizedBox(height: 24),
+                          _buildQuickActions(),
+                          const SizedBox(height: 28),
+                          const Text(
+                            "Overview",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E293B),
+                            ),
                           ),
-                          itemBuilder: (context, index) {
-                            return buildStatsCards()[index];
-                          },
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        /// =======================================================
-                        /// SECTION RECENT LISTS (SPLITS HORIZONTALLY ON BIG SCREENS)
-                        /// =======================================================
-                        if (screenWidth >= 1000) ...[
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(child: recentPayments()),
-                              const SizedBox(width: 16),
-                              Expanded(child: recentComplaints()),
-                            ],
-                          ),
-                          if (widget.role != "tenant") ...[
-                            const SizedBox(height: 24),
-                            recentVacateRequests(),
-                          ],
-                        ] else ...[
-                          recentPayments(),
-                          const SizedBox(height: 16),
-                          recentComplaints(),
-                          const SizedBox(height: 16),
-                          if (widget.role != "tenant") recentVacateRequests(),
+                          const SizedBox(height: 12),
+                          _buildMetricsGrid(screenWidth),
+                          const SizedBox(height: 28),
+                          _buildRecentActivitySection(screenWidth),
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
     );
   }
 
-  /// =====================================================
-  /// STATS CARDS PARSER
-  /// =====================================================
-  List<Widget> buildStatsCards() {
-    List<Widget> cards = [];
-    if (dashboardData == null) return cards;
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.015),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      "Welcome back, ",
+                      style: TextStyle(
+                        fontSize: 20,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        widget.userName,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _getFormattedDate(),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF2FF),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFC7D2FE)),
+            ),
+            child: Text(
+              widget.role.toUpperCase(),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF4F46E5),
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-    dashboardData!.forEach((key, value) {
-      if (key == "recent_payments" ||
-          key == "recent_complaints" ||
-          key == "recent_vacate_requests") {
-        return;
-      }
+  Widget _buildQuickActions() {
+    final List<Map<String, dynamic>> actions = [];
+    if (widget.role == "tenant") {
+      actions.addAll([
+        {
+          "label": "Pay Bills",
+          "icon": Icons.payment,
+          "color": const Color(0xFF10B981),
+          "route": "/bills",
+        },
+        {
+          "label": "File Complaint",
+          "icon": Icons.campaign_outlined,
+          "color": const Color(0xFFEF4444),
+          "route": "/complaints",
+        },
+        {
+          "label": "Agreement",
+          "icon": Icons.assignment_outlined,
+          "color": const Color(0xFF3B82F6),
+          "route": "/my-assignment",
+        },
+        {
+          "label": "Documents",
+          "icon": Icons.folder_outlined,
+          "color": const Color(0xFF8B5CF6),
+          "route": "/documents",
+        },
+      ]);
+    } else {
+      actions.addAll([
+        {
+          "label": "Rental Units",
+          "icon": Icons.add_home_work_outlined,
+          "color": const Color(0xFF3B82F6),
+          "route": "/rental-units",
+        },
+        {
+          "label": "Add Tenant",
+          "icon": Icons.person_add_alt_1_outlined,
+          "color": const Color(0xFF10B981),
+          "route": "/tenants",
+        },
+        {
+          "label": "Create Bill",
+          "icon": Icons.post_add_outlined,
+          "color": const Color(0xFFF59E0B),
+          "route": "/bills",
+        },
+        {
+          "label": "Complaints",
+          "icon": Icons.forum_outlined,
+          "color": const Color(0xFF8B5CF6),
+          "route": "/complaints",
+        },
+      ]);
+    }
 
-      cards.add(
-        StatCard(
-          title: formatTitle(key),
-          value: value.toString(),
-          icon: getIcon(key),
-          color: getColor(key),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Quick Actions",
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1E293B),
+          ),
         ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: actions.map((act) {
+            return InkWell(
+              onTap: () => _navigateTo(act["route"]),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: 130,
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.005),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: (act["color"] as Color).withOpacity(0.08),
+                      radius: 18,
+                      child: Icon(act["icon"] as IconData, color: act["color"] as Color, size: 18),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      act["label"] as String,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF475569),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetricsGrid(double screenWidth) {
+    if (widget.role == "tenant") {
+      int crossAxisCount = screenWidth < 600 ? 1 : 3;
+      double aspectRatio = screenWidth < 600 ? 3.0 : 1.8;
+
+      final rent = dashboardData?["rent"] ?? "0";
+      final unitType = dashboardData?["unit_type"] ?? "N/A";
+      final pendingBills = dashboardData?["pending_bills"] ?? 0;
+      final complaints = dashboardData?["complaints"] ?? 0;
+
+      return GridView(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: aspectRatio,
+        ),
+        children: [
+          MetricCard(
+            title: "MONTHLY RENT",
+            value: "₹$rent",
+            icon: Icons.currency_rupee,
+            color: const Color(0xFF3B82F6),
+            bottomWidget: Text(
+              "Unit Type: ${unitType.toString().toUpperCase()}",
+              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+            ),
+          ),
+          MetricCard(
+            title: "PENDING BILLS",
+            value: pendingBills.toString(),
+            icon: Icons.warning_amber_rounded,
+            color: pendingBills > 0 ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+            bottomWidget: Text(
+              pendingBills > 0 ? "Action required" : "All clear",
+              style: TextStyle(
+                fontSize: 11,
+                color: pendingBills > 0 ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          MetricCard(
+            title: "ACTIVE REQUESTS",
+            value: complaints.toString(),
+            icon: Icons.forum_outlined,
+            color: const Color(0xFF8B5CF6),
+            bottomWidget: const Text(
+              "Maintenance & complaints",
+              style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
       );
-    });
+    } else {
+      // Owner or Manager metrics layout
+      final revenue = dashboardData?["monthly_revenue"] ?? "0";
+      final tenantsCount = dashboardData?["total_tenants"] ?? 0;
+      final pendingBills = dashboardData?["pending_bills"] ?? 0;
+      final occupied = dashboardData?["occupied_units"] ?? 0;
+      final vacant = dashboardData?["vacant_units"] ?? 0;
+      final totalUnits = occupied + vacant;
+      final occupancyRate = totalUnits > 0 ? (occupied / totalUnits) : 0.0;
 
-    return cards;
-  }
+      int crossAxisCount = screenWidth < 700 ? 1 : (screenWidth < 1100 ? 2 : 3);
+      double aspectRatio = screenWidth < 700 ? 3.0 : 1.7;
 
-  /// =====================================================
-  /// RECENT PAYMENTS CARD VIEW
-  /// =====================================================
-  Widget recentPayments() {
-    final payments = dashboardData?["recent_payments"] ?? [];
-
-    return sectionCard(
-      title: "Recent Payments",
-      icon: Icons.payments,
-      color: Colors.green,
-      child: payments.isEmpty
-          ? const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Center(child: Text("No recent payments")),
-            )
-          : ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: payments.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final p = payments[index];
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFDCFCE7),
-                    child: Icon(Icons.payments, color: Colors.green, size: 20),
-                  ),
-                  title: Text(
-                    p["tenant_name"] ?? "Payment",
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                  ),
-                  subtitle: Text(p["paid_at"] ?? "", style: const TextStyle(fontSize: 12)),
-                  trailing: Text(
-                    "₹${p["amount_paid"]}",
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.green),
-                  ),
-                );
-              },
+      return Column(
+        children: [
+          GridView(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: aspectRatio,
             ),
-    );
-  }
-
-  /// =====================================================
-  /// RECENT COMPLAINTS CARD VIEW
-  /// =====================================================
-  Widget recentComplaints() {
-    final complaints = dashboardData?["recent_complaints"] ?? [];
-
-    return sectionCard(
-      title: "Recent Complaints",
-      icon: Icons.report,
-      color: Colors.red,
-      child: complaints.isEmpty
-          ? const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Center(child: Text("No recent complaints")),
-            )
-          : ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: complaints.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final c = complaints[index];
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFFEE2E2),
-                    child: Icon(Icons.report, color: Colors.red, size: 20),
-                  ),
-                  title: Text(
-                    c["title"] ?? "",
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                  ),
-                  subtitle: Text("Status: ${c["status"] ?? ""}", style: const TextStyle(fontSize: 12)),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEF2F2),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.red.shade200),
+            children: [
+              MetricCard(
+                title: "MONTHLY REVENUE",
+                value: "₹$revenue",
+                icon: Icons.payments_outlined,
+                color: const Color(0xFF10B981),
+                bottomWidget: const Text(
+                  "Current Month Collection",
+                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                ),
+              ),
+              MetricCard(
+                title: "OCCUPANCY RATE",
+                value: "${(occupancyRate * 100).toStringAsFixed(0)}%",
+                icon: Icons.home_work_outlined,
+                color: const Color(0xFF3B82F6),
+                bottomWidget: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: occupancyRate,
+                        backgroundColor: const Color(0xFFE2E8F0),
+                        color: const Color(0xFF3B82F6),
+                        minHeight: 6,
+                      ),
                     ),
-                    child: Text(
-                      c["priority"] ?? "",
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.red),
+                    const SizedBox(height: 4),
+                    Text(
+                      "$occupied occupied / $totalUnits total units",
+                      style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                     ),
+                  ],
+                ),
+              ),
+              MetricCard(
+                title: "ACTIVE TENANTS & BILLS",
+                value: tenantsCount.toString(),
+                icon: Icons.people_outline,
+                color: const Color(0xFFF59E0B),
+                bottomWidget: Text(
+                  "$pendingBills pending bills",
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFEF4444),
+                    fontWeight: FontWeight.w600,
                   ),
-                );
-              },
-            ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildPropertySummaryCard(),
+        ],
+      );
+    }
+  }
+
+  Widget _buildPropertySummaryCard() {
+    final b = dashboardData?["total_buildings"] ?? 0;
+    final f = dashboardData?["total_floors"] ?? 0;
+    final fl = dashboardData?["total_flats"] ?? 0;
+    final r = dashboardData?["total_rooms"] ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.business_outlined, color: Color(0xFF4F46E5), size: 18),
+              SizedBox(width: 8),
+              Text(
+                "Property Directory",
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildPropItem("Buildings", b.toString(), const Color(0xFF3B82F6)),
+              _buildPropItem("Floors", f.toString(), const Color(0xFF8B5CF6)),
+              _buildPropItem("Flats", fl.toString(), const Color(0xFFF59E0B)),
+              _buildPropItem("Rooms", r.toString(), const Color(0xFF10B981)),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  /// =====================================================
-  /// RECENT VACATE REQUESTS CARD VIEW
-  /// =====================================================
-  Widget recentVacateRequests() {
-    final vacates = dashboardData?["recent_vacate_requests"] ?? [];
-
-    return sectionCard(
-      title: "Vacate Requests",
-      icon: Icons.exit_to_app,
-      color: Colors.orange,
-      child: vacates.isEmpty
-          ? const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Center(child: Text("No pending vacate requests")),
-            )
-          : ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: vacates.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final v = vacates[index];
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFFFEDD5),
-                    child: Icon(Icons.exit_to_app, color: Colors.orange, size: 20),
-                  ),
-                  title: Text(
-                    v["tenant_name"] ?? "",
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                  ),
-                  subtitle: Text("Expected: ${v["vacate_date"] ?? ""}", style: const TextStyle(fontSize: 12)),
-                  trailing: Text(
-                    v["status"] ?? "",
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.orange),
-                  ),
-                );
-              },
+  Widget _buildPropItem(String label, String value, Color color) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
             ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  /// =====================================================
-  /// SECTION WRAPPER METADATA UTILITY CARD
-  /// =====================================================
-  Widget sectionCard({
+  Widget _buildRecentActivitySection(double screenWidth) {
+    bool isWide = screenWidth >= 950;
+    
+    final paymentsWidget = _buildRecentPayments();
+    final complaintsWidget = _buildRecentComplaints();
+    final vacatesWidget = widget.role != "tenant" ? _buildRecentVacateRequests() : const SizedBox.shrink();
+
+    if (isWide) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: paymentsWidget),
+              const SizedBox(width: 16),
+              Expanded(child: complaintsWidget),
+            ],
+          ),
+          if (widget.role != "tenant") ...[
+            const SizedBox(height: 20),
+            vacatesWidget,
+          ],
+        ],
+      );
+    } else {
+      return Column(
+        children: [
+          paymentsWidget,
+          const SizedBox(height: 16),
+          complaintsWidget,
+          if (widget.role != "tenant") ...[
+            const SizedBox(height: 16),
+            vacatesWidget,
+          ],
+        ],
+      );
+    }
+  }
+
+  Widget _buildSectionCard({
     required String title,
     required IconData icon,
     required Color color,
     required Widget child,
   }) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.005),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: color, size: 22),
-                const SizedBox(width: 10),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
-                  ),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: color.withOpacity(0.08),
+                radius: 16,
+                child: Icon(icon, color: color, size: 16),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            child,
-          ],
-        ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          child,
+        ],
       ),
     );
   }
 
-  String formatTitle(String text) {
-    return text.replaceAll("_", " ").toUpperCase();
+  Widget _buildRecentPayments() {
+    final payments = dashboardData?["recent_payments"] ?? [];
+
+    return _buildSectionCard(
+      title: "Recent Payments",
+      icon: Icons.receipt_long_outlined,
+      color: const Color(0xFF10B981),
+      child: payments.isEmpty
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Text(
+                  "No recent payments",
+                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                ),
+              ),
+            )
+          : ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: payments.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final p = payments[index];
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFF1F5F9)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              p["tenant_name"] ?? "Payment",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                color: Color(0xFF1E293B),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              p["paid_at"] ?? "",
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            "₹${p["amount_paid"]}",
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: Color(0xFF10B981),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            (p["payment_mode"] ?? "").toString().toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+    );
   }
 
-  IconData getIcon(String key) {
-    switch (key) {
-      case "total_buildings": return Icons.apartment;
-      case "total_floors": return Icons.layers;
-      case "total_rooms": return Icons.meeting_room;
-      case "total_tenants": return Icons.people;
-      case "occupied_units": return Icons.home;
-      case "vacant_units": return Icons.home_outlined;
-      case "pending_bills": return Icons.warning;
-      case "monthly_revenue": return Icons.currency_rupee;
-      default: return Icons.bar_chart;
-    }
+  Widget _buildRecentComplaints() {
+    final complaints = dashboardData?["recent_complaints"] ?? [];
+
+    return _buildSectionCard(
+      title: "Recent Complaints",
+      icon: Icons.bug_report_outlined,
+      color: const Color(0xFFEF4444),
+      child: complaints.isEmpty
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Text(
+                  "No recent complaints",
+                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                ),
+              ),
+            )
+          : ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: complaints.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final c = complaints[index];
+                final priority = (c["priority"] ?? "").toString().toLowerCase();
+                final status = (c["status"] ?? "").toString().toLowerCase();
+                
+                Color prioColor = Colors.grey;
+                if (priority == "high") prioColor = const Color(0xFFEF4444);
+                if (priority == "medium") prioColor = const Color(0xFFF59E0B);
+                if (priority == "low") prioColor = const Color(0xFF3B82F6);
+
+                Color statusColor = Colors.grey;
+                if (status == "resolved") statusColor = const Color(0xFF10B981);
+                if (status == "pending") statusColor = const Color(0xFFEF4444);
+                if (status == "in_progress") statusColor = const Color(0xFFF59E0B);
+
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFF1F5F9)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              c["title"] ?? "",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                color: Color(0xFF1E293B),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: prioColor.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              priority.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                                color: prioColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              c["tenant_name"] ?? "",
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF64748B),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: statusColor.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              status.replaceAll("_", " ").toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                                color: statusColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+    );
   }
 
-  Color getColor(String key) {
-    switch (key) {
-      case "total_buildings": return Colors.blue;
-      case "total_rooms": return Colors.indigo;
-      case "total_tenants": return Colors.green;
-      case "occupied_units": return Colors.teal;
-      case "vacant_units": return Colors.orange;
-      case "pending_bills": return Colors.red;
-      case "monthly_revenue": return Colors.purple;
-      default: return Colors.blueGrey;
-    }
+  Widget _buildRecentVacateRequests() {
+    final vacates = dashboardData?["recent_vacate_requests"] ?? [];
+
+    return _buildSectionCard(
+      title: "Vacate Requests",
+      icon: Icons.exit_to_app_outlined,
+      color: const Color(0xFFF59E0B),
+      child: vacates.isEmpty
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Text(
+                  "No pending vacate requests",
+                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                ),
+              ),
+            )
+          : ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: vacates.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final v = vacates[index];
+                final status = (v["status"] ?? "").toString().toLowerCase();
+                
+                Color statusColor = Colors.grey;
+                if (status == "approved") statusColor = const Color(0xFF10B981);
+                if (status == "pending") statusColor = const Color(0xFFF59E0B);
+                if (status == "rejected") statusColor = const Color(0xFFEF4444);
+
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFF1F5F9)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              v["tenant_name"] ?? "",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                color: Color(0xFF1E293B),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "Expected: ${v["vacate_date"] ?? ""}",
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          status.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+    );
   }
 }
 
-/// ============================================================================
-/// FIXED STAT CARD OVERFLOW IMMUNE IMPLEMENTATION
-/// ============================================================================
-class StatCard extends StatelessWidget {
+class MetricCard extends StatelessWidget {
   final String title;
   final String value;
   final IconData icon;
   final Color color;
+  final Widget? bottomWidget;
 
-  const StatCard({
+  const MetricCard({
     super.key,
     required this.title,
     required this.value,
     required this.icon,
     required this.color,
+    this.bottomWidget,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: color.withOpacity(0.06),
-        border: Border.all(color: color.withOpacity(0.15)),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: color.withOpacity(0.12),
-            radius: 20,
-            child: Icon(icon, color: color, size: 20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.005),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min, // 🧠 Prevents vertical expansion
-              children: [
-                Text(
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
                   title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.blueGrey.shade700,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF64748B),
                     letterSpacing: 0.5,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
-                Flexible( // 🧠 Prevents data values from breaking box thresholds
-                  child: Text(
-                    value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900, // Fixed 'FontWeight.black' bug
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+              CircleAvatar(
+                backgroundColor: color.withOpacity(0.08),
+                radius: 16,
+                child: Icon(icon, color: color, size: 16),
+              ),
+            ],
           ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (bottomWidget != null) ...[
+            const SizedBox(height: 6),
+            bottomWidget!,
+          ],
         ],
       ),
     );

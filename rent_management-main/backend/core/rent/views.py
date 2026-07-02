@@ -1003,9 +1003,77 @@ def rooms_by_flat(request, flat_id):
         "success": False,
         "message": "Invalid Request"
     })
-########################################################
-# LIST ASSIGNMENTS
-########################################################
+def update_rental_unit_status(rental_unit):
+    from .models import TenantAssignment, RentalUnit, Flat, Room
+
+    # Count active assignments
+    active_assignments = TenantAssignment.objects.filter(
+        rental_unit=rental_unit,
+        status="active"
+    )
+    occupied_count = active_assignments.count()
+    rental_unit.occupied_count = occupied_count
+
+    # Check if there is an active exclusive assignment
+    exclusive_assign = active_assignments.filter(exclusive_occupancy=True).first()
+    is_exclusive_unit = (rental_unit.occupancy_type == "exclusive")
+
+    if exclusive_assign:
+        rental_unit.exclusive_tenant = exclusive_assign.tenant
+        rental_unit.status = "occupied"
+    elif is_exclusive_unit and occupied_count >= 1:
+        first_assign = active_assignments.first()
+        rental_unit.exclusive_tenant = first_assign.tenant if first_assign else None
+        rental_unit.status = "occupied"
+    else:
+        rental_unit.exclusive_tenant = None
+        if occupied_count == 0:
+            rental_unit.status = "vacant"
+        elif occupied_count >= rental_unit.capacity:
+            rental_unit.status = "occupied"
+        else:
+            rental_unit.status = "partial"
+
+    rental_unit.save()
+
+    # Sync Room status
+    if rental_unit.room:
+        room = rental_unit.room
+        room_active = TenantAssignment.objects.filter(
+            rental_unit__room=room,
+            status="active"
+        )
+        room.occupied_count = room_active.count()
+        room_has_exclusive = room_active.filter(exclusive_occupancy=True).exists()
+        room_unit_exclusive = RentalUnit.objects.filter(room=room, occupancy_type="exclusive").exists()
+
+        if room.occupied_count == 0:
+            room.status = "vacant"
+        elif room_has_exclusive or (room_unit_exclusive and room.occupied_count >= 1) or room.occupied_count >= room.capacity:
+            room.status = "occupied"
+        else:
+            room.status = "occupied" if room.occupied_count > 0 else "vacant"
+        room.save()
+
+    # Sync Flat status
+    if rental_unit.flat:
+        flat = rental_unit.flat
+        flat_active = TenantAssignment.objects.filter(
+            rental_unit__flat=flat,
+            status="active"
+        )
+        flat.occupied_count = flat_active.count()
+        flat_has_exclusive = flat_active.filter(exclusive_occupancy=True).exists()
+        flat_unit_exclusive = RentalUnit.objects.filter(flat=flat, occupancy_type="exclusive").exists()
+
+        if flat.occupied_count == 0:
+            flat.status = "vacant"
+        elif flat_has_exclusive or (flat_unit_exclusive and flat.occupied_count >= 1) or flat.occupied_count >= flat.capacity:
+            flat.status = "occupied"
+        else:
+            flat.status = "occupied" if flat.occupied_count > 0 else "vacant"
+        flat.save()
+
 
 @csrf_exempt
 def tenant_assignments_list(request):
@@ -1130,6 +1198,43 @@ def add_tenant_assignment(request):
                 id=body.get("rental_unit_id")
             )
 
+            # Strict Capacity & Exclusive Validation Checks
+            active_assignments = TenantAssignment.objects.filter(
+                rental_unit=rental_unit,
+                status="active"
+            )
+            active_count = active_assignments.count()
+            has_exclusive = active_assignments.filter(exclusive_occupancy=True).exists()
+
+            # 1. If any active exclusive assignment exists on this unit
+            if has_exclusive:
+                return JsonResponse({
+                    "success": False,
+                    "message": "Cannot assign tenant. This unit is exclusively occupied by another tenant."
+                }, status=400)
+
+            # 2. If the unit itself is marked exclusive and already has occupants
+            if rental_unit.occupancy_type == "exclusive" and active_count >= 1:
+                return JsonResponse({
+                    "success": False,
+                    "message": "Cannot assign tenant. This is an exclusive unit and is already occupied."
+                }, status=400)
+
+            # 3. If unit capacity has been reached
+            if active_count >= rental_unit.capacity:
+                return JsonResponse({
+                    "success": False,
+                    "message": f"Cannot assign tenant. This unit has reached its maximum capacity ({rental_unit.capacity})."
+                }, status=400)
+
+            # 4. If the new assignment is exclusive, but the unit already has other active occupants
+            is_new_exclusive = body.get("exclusive_occupancy", False)
+            if is_new_exclusive and active_count >= 1:
+                return JsonResponse({
+                    "success": False,
+                    "message": "Cannot make an exclusive assignment. Please vacate or delete existing occupants for this unit first."
+                }, status=400)
+
             assignment = TenantAssignment.objects.create(
                 tenant=tenant,
                 rental_unit=rental_unit,
@@ -1167,18 +1272,7 @@ def add_tenant_assignment(request):
                 status="active"
             )
 
-            rental_unit.occupied_count += 1
-
-            if rental_unit.occupied_count == 0:
-                rental_unit.status = "vacant"
-
-            elif rental_unit.occupied_count < rental_unit.capacity:
-                rental_unit.status = "partial"
-
-            else:
-                rental_unit.status = "occupied"
-
-            rental_unit.save()
+            update_rental_unit_status(rental_unit)
 
             return JsonResponse({
                 "success": True,
@@ -1252,6 +1346,9 @@ def update_tenant_assignment(
 
             assignment.save()
 
+            if assignment.rental_unit:
+                update_rental_unit_status(assignment.rental_unit)
+
             return JsonResponse({
                 "success": True,
                 "message":
@@ -1294,21 +1391,8 @@ def vacate_tenant(
             assignment.status = "vacated"
             assignment.save()
 
-            rental_unit = assignment.rental_unit
-
-            if rental_unit.occupied_count > 0:
-                rental_unit.occupied_count -= 1
-
-            if rental_unit.occupied_count == 0:
-                rental_unit.status = "vacant"
-
-            elif rental_unit.occupied_count < rental_unit.capacity:
-                rental_unit.status = "partial"
-
-            else:
-                rental_unit.status = "occupied"
-
-            rental_unit.save()
+            if assignment.rental_unit:
+                update_rental_unit_status(assignment.rental_unit)
 
             return JsonResponse({
                 "success": True,
@@ -1327,6 +1411,35 @@ def vacate_tenant(
         "success": False,
         "message": "Invalid Request"
     })
+
+
+@csrf_exempt
+def delete_assignment(request, assignment_id):
+    if request.method == "DELETE":
+        try:
+            assignment = TenantAssignment.objects.get(id=assignment_id)
+            rental_unit = assignment.rental_unit
+            assignment.delete()
+            if rental_unit:
+                update_rental_unit_status(rental_unit)
+            return JsonResponse({
+                "success": True,
+                "message": "Assignment deleted successfully"
+            })
+        except TenantAssignment.DoesNotExist:
+            return JsonResponse({
+                "success": False,
+                "message": "Assignment not found"
+            }, status=404)
+        except Exception as e:
+            return JsonResponse({
+                "success": False,
+                "message": str(e)
+            }, status=500)
+    return JsonResponse({
+        "success": False,
+        "message": "Method not allowed"
+    }, status=405)
 
 
 ########################################################
@@ -1374,7 +1487,7 @@ def rental_units_dropdown(request):
 
         units = RentalUnit.objects.filter(
             status__in=["vacant", "partial"]
-        )
+        ).select_related("building", "floor", "flat", "room", "exclusive_tenant")
 
         data = []
 
@@ -1384,7 +1497,20 @@ def rental_units_dropdown(request):
                 "id": str(unit.id),
                 "unit_type": unit.unit_type,
                 "rent": float(unit.rent),
-                "status": unit.status
+                "status": unit.status,
+                "capacity": unit.capacity,
+                "occupied_count": unit.occupied_count,
+                "occupancy_type": unit.occupancy_type,
+                "exclusive_tenant_id": str(unit.exclusive_tenant.id) if unit.exclusive_tenant else None,
+                "exclusive_tenant_name": unit.exclusive_tenant.name if unit.exclusive_tenant else "",
+                "building_id": str(unit.building.id) if unit.building else None,
+                "building_name": unit.building.name if unit.building else "",
+                "floor_id": str(unit.floor.id) if unit.floor else None,
+                "floor_number": unit.floor.floor_number if unit.floor else None,
+                "flat_id": str(unit.flat.id) if unit.flat else None,
+                "flat_number": unit.flat.flat_number if unit.flat else "",
+                "room_id": str(unit.room.id) if unit.room else None,
+                "room_number": unit.room.room_number if unit.room else "",
             })
 
         return JsonResponse({
@@ -1409,7 +1535,8 @@ def rental_units_list(request):
             "building",
             "floor",
             "flat",
-            "room"
+            "room",
+            "exclusive_tenant"
         ).order_by("-created_at")
 
         data = []
@@ -1470,13 +1597,29 @@ def rental_units_list(request):
                 "allow_sharing":
                     unit.allow_sharing,
 
+                "occupancy_type":
+                    unit.occupancy_type,
+
+                "exclusive_tenant_id":
+                    str(unit.exclusive_tenant.id)
+                    if unit.exclusive_tenant else None,
+
+                "exclusive_tenant_name":
+                    unit.exclusive_tenant.name
+                    if unit.exclusive_tenant else "",
+
                 "status":
                     unit.status,
 
                 "created_at":
                     unit.created_at.strftime(
-                        "%d-%m-%Y"
-                    )
+                        "%Y-%m-%d %H:%M:%S"
+                    ) if unit.created_at else None,
+
+                "updated_at":
+                    unit.updated_at.strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    ) if unit.updated_at else None,
             })
 
         return JsonResponse({
@@ -1554,9 +1697,11 @@ def create_rental_unit(request):
 
                 occupied_count=0,
 
-                allow_sharing=body.get(
-                    "allow_sharing",
-                    False
+                allow_sharing=int(body.get("capacity", 1)) > 1,
+
+                occupancy_type=body.get(
+                    "occupancy_type",
+                    "shared"
                 ),
 
                 status="vacant"
@@ -1675,9 +1820,11 @@ def update_rental_unit(
                 unit.occupied_count
             )
 
-            unit.allow_sharing = body.get(
-                "allow_sharing",
-                unit.allow_sharing
+            unit.allow_sharing = int(body.get("capacity", unit.capacity)) > 1
+
+            unit.occupancy_type = body.get(
+                "occupancy_type",
+                unit.occupancy_type
             )
 
             unit.status = body.get(
@@ -1686,6 +1833,7 @@ def update_rental_unit(
             )
 
             unit.save()
+            update_rental_unit_status(unit)
 
             return JsonResponse({
 
@@ -1735,7 +1883,26 @@ def delete_rental_unit(
                 id=rental_unit_id
             )
 
-            unit.delete()
+            delete_underlying = request.GET.get('delete_underlying') == 'true'
+
+            if delete_underlying:
+                underlying_obj = None
+                if unit.unit_type == 'room' and unit.room:
+                    underlying_obj = unit.room
+                elif unit.unit_type == 'flat' and unit.flat:
+                    underlying_obj = unit.flat
+                elif unit.unit_type == 'floor' and unit.floor:
+                    underlying_obj = unit.floor
+                elif unit.unit_type == 'building' and unit.building:
+                    underlying_obj = unit.building
+
+                if underlying_obj:
+                    underlying_obj.delete()
+
+                if RentalUnit.objects.filter(id=rental_unit_id).exists():
+                    unit.delete()
+            else:
+                unit.delete()
 
             return JsonResponse({
 
@@ -2158,6 +2325,179 @@ def tenant_profile(request, tenant_id):
         "message": "Invalid Request"
 
     })
+@csrf_exempt
+def electricity_report_view(request):
+    if request.method != "GET":
+        return HttpResponse("Method Not Allowed", status=405)
+
+    try:
+        import datetime
+        from django.utils import timezone
+        from django.db.models import Q
+        
+        readings = ElectricityReading.objects.select_related(
+            "room",
+            "room__building",
+            "room__floor",
+            "room__flat",
+            "entered_by"
+        ).order_by("-reading_month")
+
+        # 1. Month filter
+        month_param = request.GET.get("month", "").strip()
+        if month_param:
+            readings = readings.filter(reading_month__year=int(month_param[:4]), reading_month__month=int(month_param[5:7]))
+
+        # 2. Building filter
+        building = request.GET.get("building", "").strip()
+        if building:
+            readings = readings.filter(room__building__name=building)
+
+        # 3. Floor filter
+        floor = request.GET.get("floor", "").strip()
+        if floor:
+            readings = readings.filter(room__floor__floor_number=floor)
+
+        # 4. Flat filter
+        flat = request.GET.get("flat", "").strip()
+        if flat:
+            readings = readings.filter(room__flat__flat_number=flat)
+
+        # 5. Room filter
+        room = request.GET.get("room", "").strip()
+        if room:
+            readings = readings.filter(room__room_number=room)
+
+        total_units = 0.0
+        total_amount = 0.0
+
+        table_rows = []
+        for item in readings:
+            prev = float(item.previous_reading or 0.0)
+            curr = float(item.current_reading or 0.0)
+            consumed = curr - prev
+            rate = float(item.unit_rate or 0.0)
+            amount_val = consumed * rate
+            
+            total_units += consumed
+            total_amount += amount_val
+
+            month_str = item.reading_month.strftime("%Y-%m") if isinstance(item.reading_month, (datetime.date, datetime.datetime)) else str(item.reading_month or "")[:7]
+            b_name = item.room.building.name if (item.room and item.room.building) else ""
+            f_num = item.room.floor.floor_number if (item.room and item.room.floor) else ""
+            flat_num = item.room.flat.flat_number if (item.room and item.room.flat) else "-"
+            r_num = item.room.room_number if item.room else ""
+
+            table_rows.append(f"""
+                <tr>
+                    <td><b>Room {r_num}</b></td>
+                    <td>{b_name}</td>
+                    <td>Floor {f_num}</td>
+                    <td>{flat_num}</td>
+                    <td>{month_str}</td>
+                    <td>{prev:,.1f}</td>
+                    <td>{curr:,.1f}</td>
+                    <td><b>{consumed:,.1f} kWh</b></td>
+                    <td>INR {rate:,.2f}</td>
+                    <td class="total">INR {amount_val:,.2f}</td>
+                </tr>
+            """)
+
+        table_rows_str = "\n".join(table_rows)
+
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Electricity Consumption Report</title>
+            <style>
+                body {{ font-family: 'Segoe UI', Arial, sans-serif; color: #333; margin: 30px; background-color: #ffffff; }}
+                h1 {{ color: #1e3a8a; margin: 0 0 5px 0; font-size: 26px; }}
+                .subtitle {{ color: #64748b; font-size: 13px; margin-bottom: 25px; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }}
+                th, td {{ padding: 10px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }}
+                th {{ background-color: #1e3a8a; color: white; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }}
+                tr:nth-child(even) {{ background-color: #f8fafc; }}
+                .total {{ font-weight: bold; color: #1e3a8a; }}
+                .summary-box {{ display: flex; gap: 20px; margin-bottom: 25px; }}
+                .summary-card {{ border: 1px solid #e2e8f0; padding: 15px; border-radius: 10px; flex: 1; background-color: #f8fafc; }}
+                .summary-card h3 {{ margin: 0 0 5px 0; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }}
+                .summary-card p {{ margin: 0; font-size: 22px; font-weight: bold; color: #0f172a; }}
+                .print-btn {{
+                    padding: 10px 20px;
+                    background-color: #1e3a8a;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: bold;
+                    font-size: 14px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    transition: background-color 0.2s;
+                }}
+                .print-btn:hover {{
+                    background-color: #1d4ed8;
+                }}
+                @media print {{
+                    body {{ margin: 10px; background-color: #fff; }}
+                    .no-print {{ display: none !important; }}
+                    .summary-card {{ background-color: #fff !important; border: 1px solid #cbd5e1 !important; }}
+                }}
+            </style>
+        </head>
+        <body>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div>
+                    <h1>Electricity Consumption & Ledger Report</h1>
+                    <div class="subtitle">Generated on {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
+                </div>
+                <button class="print-btn no-print" onclick="window.print()">Print / Save as PDF</button>
+              </div>
+              
+              <div class="summary-box">
+                  <div class="summary-card" style="border-left: 4px solid #1e3a8a;">
+                      <h3>Total Units Consumed</h3>
+                      <p>{total_units:,.1f} kWh</p>
+                  </div>
+                  <div class="summary-card" style="border-left: 4px solid #10b981;">
+                      <h3>Total Electricity Bill</h3>
+                      <p>₹{total_amount:,.2f}</p>
+                  </div>
+              </div>
+              
+              <table>
+                  <thead>
+                      <tr>
+                          <th>Room</th>
+                          <th>Building</th>
+                          <th>Floor</th>
+                          <th>Flat</th>
+                          <th>Billing Month</th>
+                          <th>Prev Reading</th>
+                          <th>Curr Reading</th>
+                          <th>Consumed</th>
+                          <th>Rate</th>
+                          <th>Bill Amount</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {table_rows_str}
+                  </tbody>
+              </table>
+
+              <script>
+                  window.addEventListener('DOMContentLoaded', () => {{
+                      setTimeout(() => {{ window.print(); }}, 600);
+                  }});
+              </script>
+          </body>
+          </html>
+          """
+        return HttpResponse(html_content)
+
+    except Exception as e:
+        return HttpResponse(f"Server Error: {str(e)}", status=500)
+
 ########################################################
 # ELECTRICITY READINGS LIST
 ########################################################
@@ -2171,6 +2511,7 @@ def electricity_readings_list(request):
             "room",
             "room__building",
             "room__floor",
+            "room__flat",
             "entered_by"
         ).order_by("-reading_month")
 
@@ -2194,6 +2535,8 @@ def electricity_readings_list(request):
                 "building_name": item.room.building.name if (item.room and item.room.building) else "",
                 "floor_id": str(item.room.floor.id) if (item.room and item.room.floor) else None,
                 "floor_number": item.room.floor.floor_number if (item.room and item.room.floor) else "",
+                "flat_id": str(item.room.flat.id) if (item.room and item.room.flat) else None,
+                "flat_number": item.room.flat.flat_number if (item.room and item.room.flat) else "",
                 "room_id": str(item.room.id) if item.room else None,
                 "room_number": item.room.room_number if item.room else "",
                 "reading_month": reading_month_str,
@@ -2387,6 +2730,246 @@ def electricity_by_room(request, room_id):
         return JsonResponse({"success": False, "message": str(e)}, status=500)
 
 
+from django.http import HttpResponse
+
+@csrf_exempt
+def bills_report_view(request):
+    if request.method != "GET":
+        return HttpResponse("Method Not Allowed", status=405)
+
+    try:
+        import datetime
+        from django.utils import timezone
+        from django.db.models import Q
+        
+        bills = Bill.objects.select_related(
+            "assignment",
+            "assignment__tenant",
+            "assignment__rental_unit",
+            "assignment__rental_unit__building",
+            "assignment__rental_unit__floor",
+            "assignment__rental_unit__flat",
+            "assignment__rental_unit__room"
+        ).prefetch_related(
+            "payment_set"
+        ).order_by("-bill_month")
+
+        # 1. Search filter
+        search = request.GET.get("search", "").strip()
+        if search:
+            bills = bills.filter(
+                Q(assignment__tenant__name__icontains=search) |
+                Q(assignment__tenant__phone__icontains=search)
+            )
+
+        # 2. Month filter
+        month_param = request.GET.get("month", "").strip() # e.g. "2026-05"
+        if month_param:
+            bills = bills.filter(bill_month__year=int(month_param[:4]), bill_month__month=int(month_param[5:7]))
+
+        # 3. Status filter
+        status_filter = request.GET.get("status", "all").strip().lower()
+        if status_filter == "paid":
+            bills = bills.filter(status="paid")
+        elif status_filter == "unpaid":
+            bills = bills.exclude(status="paid")
+
+        # 3. Building filter
+        building = request.GET.get("building", "").strip()
+        if building:
+            bills = bills.filter(assignment__rental_unit__building__name=building)
+
+        # 4. Floor filter
+        floor = request.GET.get("floor", "").strip()
+        if floor:
+            bills = bills.filter(assignment__rental_unit__floor__floor_number=floor)
+
+        # 5. Aging filter
+        aging = request.GET.get("aging", "all").strip().lower()
+        if status_filter != "paid" and aging != "all":
+            now_date = timezone.now().date()
+            if aging == "overdue":
+                bills = bills.filter(due_date__lt=now_date).exclude(status="paid")
+            else:
+                if aging == "1month":
+                    limit = now_date - datetime.timedelta(days=30)
+                    bills = bills.filter(bill_month__lte=limit).exclude(status="paid")
+                elif aging == "2months":
+                    limit = now_date - datetime.timedelta(days=60)
+                    bills = bills.filter(bill_month__lte=limit).exclude(status="paid")
+                elif aging == "3months":
+                    limit = now_date - datetime.timedelta(days=90)
+                    bills = bills.filter(bill_month__lte=limit).exclude(status="paid")
+
+        # Summary calculations
+        total_collected = 0.0
+        total_cash = 0.0
+        total_pending = 0.0
+
+        table_rows = []
+        for bill in bills:
+            latest_payment = bill.payment_set.first()
+            payment_mode = latest_payment.payment_mode if latest_payment else ""
+            utr_number = latest_payment.utr_number if latest_payment else ""
+            paid_at = latest_payment.paid_at.strftime("%Y-%m-%d %H:%M:%S") if (latest_payment and latest_payment.paid_at) else ""
+
+            is_paid = bill.status == "paid"
+            total_amount_val = float(bill.total_amount or 0.0)
+
+            if is_paid:
+                total_collected += total_amount_val
+                if payment_mode == "cash":
+                    total_cash += total_amount_val
+            else:
+                total_pending += total_amount_val
+
+            # Format fields
+            month_str = bill.bill_month.strftime("%Y-%m") if isinstance(bill.bill_month, (datetime.date, datetime.datetime)) else str(bill.bill_month or "")[:7]
+            due_str = bill.due_date.strftime("%Y-%m-%d") if isinstance(bill.due_date, (datetime.date, datetime.datetime)) else str(bill.due_date or "")
+            
+            ru = bill.assignment.rental_unit if (bill.assignment and bill.assignment.rental_unit) else None
+            b_name = ru.building.name if (ru and ru.building) else ""
+            
+            designation = ""
+            if ru and ru.room:
+                designation = f"Room {ru.room.room_number}"
+            elif ru and ru.flat:
+                designation = f"Flat {ru.flat.flat_number}"
+            
+            t_name = bill.assignment.tenant.name if (bill.assignment and bill.assignment.tenant) else "Unknown"
+            t_phone = bill.assignment.tenant.phone if (bill.assignment and bill.assignment.tenant) else ""
+
+            badge_class = "paid" if is_paid else "unpaid"
+            status_text = "PAID" if is_paid else "UNPAID"
+
+            payment_detail_str = ""
+            if is_paid:
+                payment_detail_str = f"Mode: {payment_mode.upper()}"
+                if payment_mode == "upi" and utr_number:
+                    payment_detail_str += f"<br>UTR: {utr_number}"
+                if paid_at:
+                    payment_detail_str += f"<br>Time: {paid_at}"
+            else:
+                payment_detail_str = f"Due: {due_str}"
+
+            table_rows.append(f"""
+                <tr>
+                    <td><b>{t_name}</b><br><span style="color:#666; font-size:12px;">{t_phone}</span></td>
+                    <td>{b_name}</td>
+                    <td>{designation}</td>
+                    <td>{month_str}</td>
+                    <td>INR {float(bill.rent_amount or 0.0):,.2f}</td>
+                    <td>INR {float(bill.electricity_amount or 0.0):,.2f}</td>
+                    <td>INR {float(bill.additional_amount or 0.0):,.2f}</td>
+                    <td class="total">INR {total_amount_val:,.2f}</td>
+                    <td><span class="badge {badge_class}">{status_text}</span></td>
+                    <td style="font-size:12px;">{payment_detail_str}</td>
+                </tr>
+            """)
+
+        table_rows_str = "\n".join(table_rows)
+
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Rent Bills Report</title>
+            <style>
+                body {{ font-family: 'Segoe UI', Arial, sans-serif; color: #333; margin: 30px; background-color: #ffffff; }}
+                h1 {{ color: #1e3a8a; margin: 0 0 5px 0; font-size: 26px; }}
+                .subtitle {{ color: #64748b; font-size: 13px; margin-bottom: 25px; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }}
+                th, td {{ padding: 10px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }}
+                th {{ background-color: #1e3a8a; color: white; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }}
+                tr:nth-child(even) {{ background-color: #f8fafc; }}
+                .badge {{ padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; display: inline-block; }}
+                .paid {{ background-color: #dcfce7; color: #15803d; }}
+                .unpaid {{ background-color: #fee2e2; color: #b91c1c; }}
+                .total {{ font-weight: bold; color: #1e3a8a; }}
+                .summary-box {{ display: flex; gap: 20px; margin-bottom: 25px; }}
+                .summary-card {{ border: 1px solid #e2e8f0; padding: 15px; border-radius: 10px; flex: 1; background-color: #f8fafc; }}
+                .summary-card h3 {{ margin: 0 0 5px 0; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }}
+                .summary-card p {{ margin: 0; font-size: 22px; font-weight: bold; color: #0f172a; }}
+                .print-btn {{
+                    padding: 10px 20px;
+                    background-color: #1e3a8a;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: bold;
+                    font-size: 14px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    transition: background-color 0.2s;
+                }}
+                .print-btn:hover {{
+                    background-color: #1d4ed8;
+                }}
+                @media print {{
+                    body {{ margin: 10px; background-color: #fff; }}
+                    .no-print {{ display: none !important; }}
+                    .summary-card {{ background-color: #fff !important; border: 1px solid #cbd5e1 !important; }}
+                }}
+            </style>
+        </head>
+        <body>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div>
+                    <h1>Rent Collection & Ledger Report</h1>
+                    <div class="subtitle">Generated on {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
+                </div>
+                <button class="print-btn no-print" onclick="window.print()">Print / Save as PDF</button>
+            </div>
+            
+            <div class="summary-box">
+                <div class="summary-card" style="border-left: 4px solid #16a34a;">
+                    <h3>Total Collected (UPI + Cash)</h3>
+                    <p>₹{total_collected:,.2f}</p>
+                </div>
+                <div class="summary-card" style="border-left: 4px solid #059669;">
+                    <h3>Collected in Cash</h3>
+                    <p>₹{total_cash:,.2f}</p>
+                </div>
+                <div class="summary-card" style="border-left: 4px solid #ea580c;">
+                    <h3>Total Outstanding (Pending)</h3>
+                    <p>₹{total_pending:,.2f}</p>
+                </div>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tenant</th>
+                        <th>Building</th>
+                        <th>Room/Flat</th>
+                        <th>Month</th>
+                        <th>Base Rent</th>
+                        <th>Electricity</th>
+                        <th>Extra Charges</th>
+                        <th>Total Amount</th>
+                        <th>Status</th>
+                        <th>Payment / Due Info</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {table_rows_str}
+                </tbody>
+            </table>
+
+            <script>
+                window.addEventListener('DOMContentLoaded', () => {{
+                    setTimeout(() => {{ window.print(); }}, 600);
+                }});
+            </script>
+        </body>
+        </html>
+        """
+        return HttpResponse(html_content)
+
+    except Exception as e:
+        return HttpResponse(f"Server Error: {str(e)}", status=500)
+
+
 ########################################################
 # LIST BILLS
 ########################################################
@@ -2398,9 +2981,15 @@ def bills_list(request):
     try:
         bills = Bill.objects.select_related(
             "assignment",
-            "assignment__tenant"
+            "assignment__tenant",
+            "assignment__rental_unit",
+            "assignment__rental_unit__building",
+            "assignment__rental_unit__floor",
+            "assignment__rental_unit__flat",
+            "assignment__rental_unit__room"
         ).prefetch_related(
-            "charges"
+            "charges",
+            "payment_set"
         ).order_by("-bill_month")
 
         data = []
@@ -2426,10 +3015,37 @@ def bills_list(request):
                 else str(bill.due_date or "")
             )
 
+            # Get payment details if paid
+            latest_payment = bill.payment_set.first()
+            payment_id = str(latest_payment.id) if latest_payment else ""
+            payment_mode = latest_payment.payment_mode if latest_payment else ""
+            utr_number = latest_payment.utr_number if latest_payment else ""
+            paid_at = latest_payment.paid_at.strftime("%Y-%m-%d %H:%M:%S") if (latest_payment and latest_payment.paid_at) else ""
+
+            # Rental unit details
+            ru = bill.assignment.rental_unit if (bill.assignment and bill.assignment.rental_unit) else None
+            building_id = str(ru.building.id) if (ru and ru.building) else None
+            building_name = ru.building.name if (ru and ru.building) else ""
+            floor_id = str(ru.floor.id) if (ru and ru.floor) else None
+            floor_number = ru.floor.floor_number if (ru and ru.floor) else None
+            flat_number = ru.flat.flat_number if (ru and ru.flat) else ""
+            room_number = ru.room.room_number if (ru and ru.room) else ""
+
             data.append({
                 "id": str(bill.id),
                 "assignment_id": str(bill.assignment.id) if bill.assignment else None,
                 "tenant_name": bill.assignment.tenant.name if (bill.assignment and bill.assignment.tenant) else "Unknown Tenant",
+                "tenant_phone": bill.assignment.tenant.phone if (bill.assignment and bill.assignment.tenant) else "",
+                "building_id": building_id,
+                "building_name": building_name,
+                "floor_id": floor_id,
+                "floor_number": floor_number,
+                "flat_number": flat_number,
+                "room_number": room_number,
+                "payment_id": payment_id,
+                "payment_mode": payment_mode,
+                "utr_number": utr_number,
+                "paid_at": paid_at,
                 "bill_month": bill_month_str,
                 "billing_period_start": bill_month_str,
                 "rent_amount": float(bill.rent_amount or 0.0),
@@ -4679,3 +5295,200 @@ def managers_api(request):
         "success": False,
         "error": "Method not allowed",
     }, status=405)
+
+
+@csrf_exempt
+def assignments_report_view(request):
+    if request.method != "GET":
+        return HttpResponse("Method Not Allowed", status=405)
+
+    try:
+        from django.utils import timezone
+        from django.db.models import Q
+        
+        assignments = TenantAssignment.objects.select_related(
+            "tenant",
+            "rental_unit",
+            "rental_unit__building",
+            "rental_unit__floor",
+            "rental_unit__flat",
+            "rental_unit__room"
+        ).order_by("-rent_start_date")
+
+        # 1. Search Filter
+        search = request.GET.get("search", "").strip()
+        if search:
+            assignments = assignments.filter(
+                Q(tenant__name__icontains=search) |
+                Q(tenant__phone__icontains=search) |
+                Q(rental_unit__room__room_number__icontains=search) |
+                Q(rental_unit__flat__flat_number__icontains=search)
+            )
+
+        # 2. Building Filter
+        building = request.GET.get("building", "").strip()
+        if building:
+            assignments = assignments.filter(rental_unit__building__name=building)
+
+        # 3. Floor Filter
+        floor = request.GET.get("floor", "").strip()
+        if floor:
+            assignments = assignments.filter(rental_unit__floor__floor_number=floor)
+
+        # 4. Room Filter
+        room = request.GET.get("room", "").strip()
+        if room:
+            assignments = assignments.filter(rental_unit__room__room_number=room)
+
+        # 5. Rent range
+        rent_min = request.GET.get("rent_min", "").strip()
+        if rent_min:
+            assignments = assignments.filter(final_rent__gte=float(rent_min))
+        rent_max = request.GET.get("rent_max", "").strip()
+        if rent_max:
+            assignments = assignments.filter(final_rent__lte=float(rent_max))
+
+        # 6. Status Filter
+        status_filter = request.GET.get("status", "all").strip().lower()
+        if status_filter in ["active", "vacated", "pending"]:
+            assignments = assignments.filter(status=status_filter)
+
+        # 7. Sorting
+        sort = request.GET.get("sort", "newest").strip().lower()
+        if sort == "oldest":
+            assignments = assignments.order_by("rent_start_date")
+        else:
+            assignments = assignments.order_by("-rent_start_date")
+
+        # Generate HTML table rows
+        table_rows = []
+        for i, item in enumerate(assignments, 1):
+            tenant_name = item.tenant.name if item.tenant else ""
+            tenant_phone = item.tenant.phone if item.tenant else ""
+            
+            unit_details = ""
+            ru = item.rental_unit
+            if ru:
+                if ru.room:
+                    if ru.flat:
+                        unit_details = f"Room {ru.room.room_number} (Flat {ru.flat.flat_number})"
+                    else:
+                        unit_details = f"Room {ru.room.room_number}"
+                elif ru.flat:
+                    unit_details = f"Flat {ru.flat.flat_number}"
+                elif ru.building:
+                    unit_details = f"{ru.building.name} Building"
+            
+            building_name = ru.building.name if (ru and ru.building) else ""
+            floor_num = ru.floor.floor_number if (ru and ru.floor) else ""
+            
+            rent_val = float(item.final_rent)
+            deposit_val = float(item.security_deposit)
+            discount_val = float(item.discount_percent)
+            start_date = item.rent_start_date.strftime("%Y-%m-%d") if item.rent_start_date else ""
+            status_str = item.status.upper()
+            occupancy = "Exclusive" if item.exclusive_occupancy else "Shared"
+
+            table_rows.append(f"""
+                <tr>
+                    <td>{i}</td>
+                    <td><b>{tenant_name}</b><br><small style='color: #64748b;'>{tenant_phone}</small></td>
+                    <td>{building_name}</td>
+                    <td>Floor {floor_num}</td>
+                    <td>{unit_details}</td>
+                    <td>INR {rent_val:,.2f}</td>
+                    <td>INR {deposit_val:,.2f}</td>
+                    <td>{discount_val}%</td>
+                    <td>{start_date}</td>
+                    <td>{occupancy}</td>
+                    <td><span class="status-badge status-{item.status}">{status_str}</span></td>
+                </tr>
+            """)
+
+        table_rows_str = "\n".join(table_rows)
+
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Tenant Assignments Report</title>
+            <style>
+                body {{ font-family: 'Segoe UI', Arial, sans-serif; color: #333; margin: 30px; background-color: #ffffff; }}
+                h1 {{ color: #1e3a8a; margin: 0 0 5px 0; font-size: 24px; }}
+                .subtitle {{ color: #64748b; font-size: 13px; margin-bottom: 25px; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }}
+                th, td {{ padding: 10px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }}
+                th {{ background-color: #1e3a8a; color: white; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }}
+                tr:nth-child(even) {{ background-color: #f8fafc; }}
+                .print-btn {{
+                    padding: 8px 16px;
+                    background-color: #1e3a8a;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: bold;
+                    font-size: 13px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    transition: background-color 0.2s;
+                }}
+                .print-btn:hover {{
+                    background-color: #1d4ed8;
+                }}
+                .status-badge {{
+                    padding: 3px 8px;
+                    border-radius: 12px;
+                    font-size: 10px;
+                    font-weight: bold;
+                }}
+                .status-active {{ background-color: #dcfce7; color: #15803d; }}
+                .status-vacated {{ background-color: #fee2e2; color: #b91c1c; }}
+                .status-pending {{ background-color: #fef3c7; color: #b45309; }}
+                @media print {{
+                    body {{ margin: 10px; background-color: #fff; }}
+                    .no-print {{ display: none !important; }}
+                }}
+            </style>
+        </head>
+        <body>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div>
+                    <h1>Tenant Assignments Ledger Report</h1>
+                    <div class="subtitle">Generated on {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
+                </div>
+                <button class="print-btn no-print" onclick="window.print()">Print / Save as PDF</button>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Tenant</th>
+                        <th>Building</th>
+                        <th>Floor</th>
+                        <th>Unit Details</th>
+                        <th>Final Rent</th>
+                        <th>Security Deposit</th>
+                        <th>Discount</th>
+                        <th>Start Date</th>
+                        <th>Occupancy</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {table_rows_str}
+                </tbody>
+            </table>
+
+            <script>
+                window.addEventListener('DOMContentLoaded', () => {{
+                    setTimeout(() => {{ window.print(); }}, 600);
+                }});
+            </script>
+        </body>
+        </html>
+        """
+        return HttpResponse(html_content)
+
+    except Exception as e:
+        return HttpResponse(f"Server Error: {str(e)}", status=500)

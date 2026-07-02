@@ -33,7 +33,7 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
 
   // Dropdown/Form parameters explicitly matching your backend entity structure
   String selectedUnitType = "room";
-  bool allowSharing = false;
+  String selectedOccupancyType = "shared"; // policy selector
 
   final TextEditingController rentController = TextEditingController();
   final TextEditingController capacityController = TextEditingController();
@@ -42,15 +42,119 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
   final TextEditingController flatIdController = TextEditingController();
   final TextEditingController roomIdController = TextEditingController();
 
+  List<dynamic> buildings = [];
+  List<dynamic> allFlats = [];
+  List<dynamic> allRooms = [];
+  List<dynamic> currentFloors = [];
+  bool isDropdownLoading = false;
+  bool isFloorsLoading = false;
+
+  // Filter State
+  String searchQuery = "";
+  String? selectedBuildingId;
+  String? selectedFloorId;
+  String? selectedFlatId;
+  String? selectedRoomId;
+  String? selectedStatus;
+  String? filterOccupancyPolicy; // shared, exclusive, exclusive_occupied
+  String selectedSort = "recently_changed"; // default to recently changed
+  bool isFiltersExpanded = false;
+
+  // Track dynamically loaded floors for filter bar
+  List<dynamic> filterFloors = [];
+  bool isFilterFloorsLoading = false;
+
   @override
   void initState() {
     super.initState();
     fetchUnits();
+    fetchDropdownData();
   }
 
-  ////////////////////////////////////////////////////////////
-  /// FETCH UNITS
-  ////////////////////////////////////////////////////////////
+  Future<void> fetchDropdownData() async {
+    setState(() => isDropdownLoading = true);
+    try {
+      final buildingsRes = await http.get(Uri.parse("$baseUrl/api/buildings-dropdown/"));
+      final flatsRes = await http.get(Uri.parse("$baseUrl/api/flats/"));
+      final roomsRes = await http.get(Uri.parse("$baseUrl/api/rooms/"));
+
+      if (buildingsRes.statusCode == 200 && flatsRes.statusCode == 200 && roomsRes.statusCode == 200) {
+        final bData = jsonDecode(buildingsRes.body);
+        final flData = jsonDecode(flatsRes.body);
+        final rData = jsonDecode(roomsRes.body);
+
+        setState(() {
+          buildings = bData["data"] ?? [];
+          allFlats = flData["data"] ?? [];
+          allRooms = rData["data"] ?? [];
+          isDropdownLoading = false;
+        });
+      } else {
+        setState(() => isDropdownLoading = false);
+      }
+    } catch (e) {
+      debugPrint(e.toString());
+      setState(() => isDropdownLoading = false);
+    }
+  }
+
+  Future<void> fetchFloorsForBuilding(String buildingId, StateSetter setDialogState) async {
+    setDialogState(() {
+      isFloorsLoading = true;
+      currentFloors = [];
+    });
+
+    try {
+      final res = await http.get(Uri.parse("$baseUrl/api/floors-by-building/$buildingId/"));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data["success"] == true) {
+          setDialogState(() {
+            currentFloors = data["data"] ?? [];
+            isFloorsLoading = false;
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint(e.toString());
+    }
+
+    setDialogState(() {
+      isFloorsLoading = false;
+    });
+  }
+
+  Future<void> fetchFloorsForFilter(String buildingId) async {
+    setState(() {
+      isFilterFloorsLoading = true;
+      filterFloors = [];
+      selectedFloorId = null;
+      selectedFlatId = null;
+      selectedRoomId = null;
+    });
+
+    try {
+      final res = await http.get(Uri.parse("$baseUrl/api/floors-by-building/$buildingId/"));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data["success"] == true) {
+          setState(() {
+            filterFloors = data["data"] ?? [];
+            isFilterFloorsLoading = false;
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint(e.toString());
+    }
+
+    setState(() {
+      isFilterFloorsLoading = false;
+    });
+  }
+
   Future<void> fetchUnits() async {
     try {
       final res = await http.get(
@@ -74,16 +178,12 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
     }
   }
 
-  ////////////////////////////////////////////////////////////
-  /// ADD / UPDATE UNIT
-  ////////////////////////////////////////////////////////////
   Future<void> saveUnit() async {
     if (rentController.text.isEmpty) return;
 
     setState(() => isSaving = true);
 
     try {
-      // Corrected url routing structures matching your Django patterns
       final url = isEdit
           ? "$baseUrl/api/rental-units/$editId/update/"
           : "$baseUrl/api/rental-units/create/";
@@ -110,6 +210,7 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
             content: Text(
               isEdit ? "Unit Updated Successfully" : "Unit Created Successfully",
             ),
@@ -124,11 +225,13 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
   }
 
   Map<String, dynamic> _buildRequestBody() {
+    final int cap = int.tryParse(capacityController.text) ?? 1;
     return {
       "unit_type": selectedUnitType,
       "rent": double.tryParse(rentController.text) ?? 0.0,
-      "capacity": int.tryParse(capacityController.text) ?? 1,
-      "allow_sharing": allowSharing,
+      "capacity": cap,
+      "allow_sharing": cap > 1, // Treat cap > 1 as sharing dynamically
+      "occupancy_type": selectedOccupancyType,
       "building_id": buildingIdController.text.trim().isEmpty ? null : buildingIdController.text.trim(),
       "floor_id": floorIdController.text.trim().isEmpty ? null : floorIdController.text.trim(),
       "flat_id": flatIdController.text.trim().isEmpty ? null : flatIdController.text.trim(),
@@ -136,14 +239,10 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
     };
   }
 
-  ////////////////////////////////////////////////////////////
-  /// DELETE UNIT
-  ////////////////////////////////////////////////////////////
-  Future<void> deleteUnit(String id) async {
+  Future<void> deleteUnit(String id, {bool deleteUnderlying = false}) async {
     try {
-      // Corrected endpoint mapping structure
       final res = await http.delete(
-        Uri.parse("$baseUrl/api/rental-units/$id/delete/"),
+        Uri.parse("$baseUrl/api/rental-units/$id/delete/?delete_underlying=$deleteUnderlying"),
       );
 
       if (res.statusCode == 200) {
@@ -152,6 +251,7 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
             content: Text("Unit Permanently Purged"),
           ),
         );
@@ -161,9 +261,70 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
     }
   }
 
-  ////////////////////////////////////////////////////////////
-  /// CLEAR
-  ////////////////////////////////////////////////////////////
+  Future<void> confirmDeleteUnit(Map unit) async {
+    bool deleteUnderlying = false;
+    final unitType = unit["unit_type"] ?? "unit";
+    final unitId = unit["id"];
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text("Delete Rental Unit"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Are you sure you want to delete this Rental Unit?"),
+                  const SizedBox(height: 15),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: deleteUnderlying,
+                        onChanged: (val) {
+                          setState(() {
+                            deleteUnderlying = val ?? false;
+                          });
+                        },
+                      ),
+                      Expanded(
+                        child: Text(
+                          "Also delete the associated $unitType from the database",
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text("Cancel"),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text("Delete", style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result == true) {
+      await deleteUnit(unitId, deleteUnderlying: deleteUnderlying);
+    }
+  }
+
   void clearFields() {
     rentController.clear();
     capacityController.clear();
@@ -172,22 +333,19 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
     flatIdController.clear();
     roomIdController.clear();
     selectedUnitType = "room";
-    allowSharing = false;
+    selectedOccupancyType = "shared";
     isEdit = false;
     editId = "";
   }
 
-  ////////////////////////////////////////////////////////////
-  /// OPEN FORM DIALOG
-  ////////////////////////////////////////////////////////////
-  void openDialog({Map? unit}) {
+  void openDialog({Map? unit}) async {
     if (unit != null) {
       isEdit = true;
       editId = unit["id"];
       selectedUnitType = unit["unit_type"] ?? "room";
+      selectedOccupancyType = unit["occupancy_type"] ?? "shared";
       rentController.text = (unit["rent"] ?? 0).toString();
       capacityController.text = (unit["capacity"] ?? 1).toString();
-      allowSharing = unit["allow_sharing"] == true;
       buildingIdController.text = unit["building_id"] ?? "";
       floorIdController.text = unit["floor_id"] ?? "";
       flatIdController.text = unit["flat_id"] ?? "";
@@ -196,20 +354,69 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
       clearFields();
     }
 
+    String? tempBuildingId = buildingIdController.text.trim().isEmpty ? null : buildingIdController.text.trim();
+    String? tempFloorId = floorIdController.text.trim().isEmpty ? null : floorIdController.text.trim();
+    String? tempFlatId = flatIdController.text.trim().isEmpty ? null : flatIdController.text.trim();
+    String? tempRoomId = roomIdController.text.trim().isEmpty ? null : roomIdController.text.trim();
+
+    currentFloors = [];
+    if (tempBuildingId != null) {
+      setState(() => isFloorsLoading = true);
+      try {
+        final res = await http.get(Uri.parse("$baseUrl/api/floors-by-building/$tempBuildingId/"));
+        if (res.statusCode == 200) {
+          final data = jsonDecode(res.body);
+          if (data["success"] == true) {
+            currentFloors = data["data"] ?? [];
+          }
+        }
+      } catch (e) {
+        debugPrint(e.toString());
+      }
+      setState(() => isFloorsLoading = false);
+    }
+
     showDialog(
       context: context,
       builder: (_) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            // Safety checks to prevent dropdown assertion errors
+            if (tempBuildingId != null && !buildings.any((b) => b["id"] == tempBuildingId)) {
+              tempBuildingId = null;
+            }
+            if (tempFloorId != null && !currentFloors.any((f) => f["id"] == tempFloorId)) {
+              tempFloorId = null;
+            }
+
+            final filteredFlats = allFlats.where((f) => f["building_id"] == tempBuildingId && f["floor_id"] == tempFloorId).toList();
+            if (tempFlatId != null && !filteredFlats.any((f) => f["id"] == tempFlatId)) {
+              tempFlatId = null;
+            }
+
+            final filteredRooms = allRooms.where((r) {
+              if (r["building_id"] != tempBuildingId || r["floor_id"] != tempFloorId) {
+                return false;
+              }
+              if (tempFlatId != null) {
+                return r["flat_id"] == tempFlatId;
+              } else {
+                return r["flat_id"] == null || r["flat_id"].toString().isEmpty;
+              }
+            }).toList();
+
+            if (tempRoomId != null && !filteredRooms.any((r) => r["id"] == tempRoomId)) {
+              tempRoomId = null;
+            }
+
             return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              title: Text(isEdit ? "Modify Rental Unit" : "Add Rental Unit"),
-              content: SizedBox(
-                width: 450,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text(isEdit ? "Modify Rental Unit" : "Add Rental Unit", style: const TextStyle(fontWeight: FontWeight.bold)),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 450),
                 child: SingleChildScrollView(
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       DropdownButtonFormField<String>(
                         value: selectedUnitType,
@@ -220,32 +427,173 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
                           DropdownMenuItem(value: "flat", child: Text("Flat")),
                           DropdownMenuItem(value: "room", child: Text("Room")),
                         ],
-                        onChanged: (val) => setDialogState(() => selectedUnitType = val!),
+                        onChanged: (val) => setDialogState(() {
+                          selectedUnitType = val!;
+                          tempBuildingId = null;
+                          buildingIdController.clear();
+                          tempFloorId = null;
+                          floorIdController.clear();
+                          tempFlatId = null;
+                          flatIdController.clear();
+                          tempRoomId = null;
+                          roomIdController.clear();
+                        }),
                       ),
                       const SizedBox(height: 12),
                       _field("Monthly Rent (₹)", rentController, isNumeric: true),
                       const SizedBox(height: 12),
-                      _field("Capacity (Max Occupants)", capacityController, isNumeric: true),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _field("Capacity (Max Occupants)", capacityController, isNumeric: true),
+                          const SizedBox(height: 4),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 4.0),
+                            child: Text(
+                              "Capacity = 1: Single Occupancy Only | Capacity > 1: Sharing Allowed",
+                              style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
-                      SwitchListTile(
-                        title: const Text("Allow Unit Sharing"),
-                        value: allowSharing,
-                        contentPadding: EdgeInsets.zero,
-                        onChanged: (val) => setDialogState(() => allowSharing = val),
+                      DropdownButtonFormField<String>(
+                        value: selectedOccupancyType,
+                        decoration: const InputDecoration(labelText: "Unit Policy", border: OutlineInputBorder()),
+                        items: const [
+                          DropdownMenuItem(value: "shared", child: Text("Shared Policy (Multiple Tenants Allowed)")),
+                          DropdownMenuItem(value: "exclusive", child: Text("Exclusive Policy (Dedicated to Single Tenant)")),
+                        ],
+                        onChanged: (val) => setDialogState(() => selectedOccupancyType = val!),
                       ),
                       const Divider(height: 24),
                       const Align(
                         alignment: Alignment.centerLeft,
-                        child: Text("Structural Hierarchies (Optional UUIDs)", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                        child: Text("Structural Hierarchies", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12)),
                       ),
-                      const SizedBox(height: 8),
-                      _field("Building UUID", buildingIdController),
-                      const SizedBox(height: 10),
-                      _field("Floor UUID", floorIdController),
-                      const SizedBox(height: 10),
-                      _field("Flat UUID", flatIdController),
-                      const SizedBox(height: 10),
-                      _field("Room UUID", roomIdController),
+                      const SizedBox(height: 12),
+                      
+                      // Building Dropdown
+                      DropdownButtonFormField<String>(
+                        value: tempBuildingId,
+                        decoration: const InputDecoration(labelText: "Select Building", border: OutlineInputBorder()),
+                        items: buildings.map<DropdownMenuItem<String>>((b) {
+                          return DropdownMenuItem<String>(
+                            value: b["id"],
+                            child: Text(b["name"] ?? ""),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          setDialogState(() {
+                            tempBuildingId = val;
+                            buildingIdController.text = val ?? "";
+                            tempFloorId = null;
+                            floorIdController.clear();
+                            tempFlatId = null;
+                            flatIdController.clear();
+                            tempRoomId = null;
+                            roomIdController.clear();
+                          });
+                          if (val != null) {
+                            fetchFloorsForBuilding(val, setDialogState);
+                          }
+                        },
+                      ),
+
+                      // Floor Dropdown
+                      if (selectedUnitType != "building" && tempBuildingId != null) ...[
+                        const SizedBox(height: 12),
+                        isFloorsLoading
+                            ? const Padding(
+                                padding: EdgeInsets.all(8.0),
+                                child: CircularProgressIndicator(),
+                              )
+                            : DropdownButtonFormField<String>(
+                                value: tempFloorId,
+                                decoration: const InputDecoration(labelText: "Select Floor", border: OutlineInputBorder()),
+                                items: currentFloors.map<DropdownMenuItem<String>>((f) {
+                                  final dispName = f["floor_name"] != null && f["floor_name"].toString().isNotEmpty
+                                      ? f["floor_name"]
+                                      : "Floor ${f["floor_number"]}";
+                                  return DropdownMenuItem<String>(
+                                    value: f["id"],
+                                    child: Text(dispName.toString()),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  setDialogState(() {
+                                    tempFloorId = val;
+                                    floorIdController.text = val ?? "";
+                                    tempFlatId = null;
+                                    flatIdController.clear();
+                                    tempRoomId = null;
+                                    roomIdController.clear();
+                                  });
+                                },
+                              ),
+                      ],
+
+                      // Flat Dropdown
+                      if ((selectedUnitType == "flat" || selectedUnitType == "room") && tempFloorId != null) ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: tempFlatId,
+                          decoration: InputDecoration(
+                            labelText: selectedUnitType == "room" ? "Select Flat (Optional)" : "Select Flat",
+                            border: const OutlineInputBorder()
+                          ),
+                          items: [
+                            if (selectedUnitType == "room")
+                              const DropdownMenuItem<String>(
+                                value: null,
+                                child: Text("None (Direct Room under Floor)"),
+                              ),
+                            ...filteredFlats.map<DropdownMenuItem<String>>((f) {
+                              return DropdownMenuItem<String>(
+                                value: f["id"],
+                                child: Text("Flat ${f["flat_number"]}"),
+                              );
+                            }),
+                          ],
+                          onChanged: (val) {
+                            setDialogState(() {
+                              tempFlatId = val;
+                              flatIdController.text = val ?? "";
+                              tempRoomId = null;
+                              roomIdController.clear();
+                            });
+                          },
+                        ),
+                      ],
+
+                      // Room Dropdown
+                      if (selectedUnitType == "room" && tempFloorId != null) ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: tempRoomId,
+                          decoration: const InputDecoration(labelText: "Select Room", border: OutlineInputBorder()),
+                          items: filteredRooms.map<DropdownMenuItem<String>>((r) {
+                            return DropdownMenuItem<String>(
+                              value: r["id"],
+                              child: Text("Room ${r["room_number"]}"),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            setDialogState(() {
+                              tempRoomId = val;
+                              roomIdController.text = val ?? "";
+                            });
+                          },
+                        ),
+                        if (filteredRooms.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              "No matching rooms found. Please create a Room first.",
+                              style: TextStyle(color: Colors.red, fontSize: 13),
+                            ),
+                          ),
+                      ],
                     ],
                   ),
                 ),
@@ -256,6 +604,9 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
                   child: const Text("Cancel"),
                 ),
                 ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                   onPressed: isSaving ? null : saveUnit,
                   child: Text(isEdit ? "Update" : "Save"),
                 ),
@@ -267,11 +618,72 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
     );
   }
 
-  ////////////////////////////////////////////////////////////
-  /// UI ROOT BUILDER
-  ////////////////////////////////////////////////////////////
   @override
   Widget build(BuildContext context) {
+    // 1. Process local UI filtering
+    final filtered = units.where((unit) {
+      final query = searchQuery.trim().toLowerCase();
+      final bName = (unit["building_name"] ?? "").toString().toLowerCase();
+      final fNum = (unit["floor_number"] ?? "").toString().toLowerCase();
+      final flNum = (unit["flat_number"] ?? "").toString().toLowerCase();
+      final rNum = (unit["room_number"] ?? "").toString().toLowerCase();
+      final matchesQuery = query.isEmpty ||
+          bName.contains(query) ||
+          fNum.contains(query) ||
+          flNum.contains(query) ||
+          rNum.contains(query);
+
+      final matchesBuilding = selectedBuildingId == null ||
+          unit["building_id"]?.toString() == selectedBuildingId;
+
+      final matchesFloor = selectedFloorId == null ||
+          unit["floor_id"]?.toString() == selectedFloorId;
+
+      final matchesFlat = selectedFlatId == null ||
+          unit["flat_id"]?.toString() == selectedFlatId;
+
+      final matchesRoom = selectedRoomId == null ||
+          unit["room_id"]?.toString() == selectedRoomId;
+
+      final matchesStatus = selectedStatus == null ||
+          unit["status"]?.toString().toLowerCase() == selectedStatus!.toLowerCase();
+
+      final matchesPolicy = filterOccupancyPolicy == null ||
+          (filterOccupancyPolicy == "shared" && unit["occupancy_type"] == "shared") ||
+          (filterOccupancyPolicy == "exclusive" && unit["occupancy_type"] == "exclusive") ||
+          (filterOccupancyPolicy == "exclusive_occupied" && unit["exclusive_tenant_id"] != null);
+
+      return matchesQuery &&
+          matchesBuilding &&
+          matchesFloor &&
+          matchesFlat &&
+          matchesRoom &&
+          matchesStatus &&
+          matchesPolicy;
+    }).toList();
+
+    // 2. Process sorting
+    filtered.sort((a, b) {
+      if (selectedSort == "newest") {
+        final aDate = a["created_at"]?.toString() ?? "";
+        final bDate = b["created_at"]?.toString() ?? "";
+        return bDate.compareTo(aDate);
+      } else if (selectedSort == "oldest") {
+        final aDate = a["created_at"]?.toString() ?? "";
+        final bDate = b["created_at"]?.toString() ?? "";
+        return aDate.compareTo(bDate);
+      } else if (selectedSort == "recently_changed") {
+        final aDate = a["updated_at"]?.toString() ?? "";
+        final bDate = b["updated_at"]?.toString() ?? "";
+        return bDate.compareTo(aDate);
+      }
+      return 0;
+    });
+
+    final int vacantCount = units.where((u) => u["status"] == "vacant").length;
+    final int partialCount = units.where((u) => u["status"] == "partial").length;
+    final int occupiedCount = units.where((u) => u["status"] == "occupied").length;
+
     return MainLayout(
       role: widget.role,
       userName: widget.userName,
@@ -279,100 +691,91 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
       currentIndex: 6,
       child: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(20),
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _header(),
+                  const SizedBox(height: 24),
+                  
+                  // Summary Badges
+                  Row(
+                    children: [
+                      _summaryCard("Vacant", vacantCount, Colors.green),
+                      const SizedBox(width: 12),
+                      _summaryCard("Partial", partialCount, Colors.orange),
+                      const SizedBox(width: 12),
+                      _summaryCard("Occupied", occupiedCount, Colors.red),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Search and filter options
+                  _filterBar(),
                   const SizedBox(height: 20),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: ElevatedButton.icon(
-                      onPressed: () => openDialog(),
-                      icon: const Icon(Icons.add),
-                      label: const Text("Add Rental Unit"),
-                    ),
+
+                  // Action + Results Grid
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "${filtered.length} Rental Units Found",
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B)),
+                      ),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1E3A8A),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                        onPressed: () => openDialog(),
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text("Add Rental Unit", style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 20),
-                  Expanded(
-                    child: units.isEmpty
-                        ? const Center(child: Text("No rental units mapped yet.", style: TextStyle(color: Colors.grey, fontSize: 16)))
-                        : GridView.builder(
-                            itemCount: units.length,
-                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 15,
-                              crossAxisSpacing: 15,
-                              childAspectRatio: 1.4,
-                            ),
-                            itemBuilder: (context, index) {
-                              final unit = units[index];
 
-                              // Resolving dynamic composite names based on the nested models returned by backend select_related query
-                              String designation = "Unit Block";
-                              if (unit["room_number"].toString().isNotEmpty) {
-                                if (unit["flat_number"].toString().isNotEmpty) {
-                                  designation = "Room ${unit["room_number"]} (Flat ${unit["flat_number"]})";
-                                } else {
-                                  designation = "Room ${unit["room_number"]} (Floor ${unit["floor_number"]})";
-                                }
-                              } else if (unit["flat_number"].toString().isNotEmpty) {
-                                designation = "Flat ${unit["flat_number"]}";
-                              } else if (unit["building_name"].toString().isNotEmpty) {
-                                designation = "${unit["building_name"]} Building";
-                              }
-
-                              return Container(
-                                padding: const EdgeInsets.all(15),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.05),
-                                      blurRadius: 10,
-                                    )
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      designation,
-                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text("Type: ${unit["unit_type"].toString().toUpperCase()}", style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.w600)),
-                                    Text("Rent: ₹${unit["rent"]}"),
-                                    Text("Occupancy: ${unit["occupied_count"]} / ${unit["capacity"]}"),
-                                    Text("Status: ${unit["status"].toString().toUpperCase()}",
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: unit["status"] == "vacant" ? Colors.green : Colors.orange
-                                      )
-                                    ),
-                                    const Spacer(),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        IconButton(
-                                          onPressed: () => openDialog(unit: unit),
-                                          icon: const Icon(Icons.edit, color: Colors.blue),
-                                        ),
-                                        IconButton(
-                                          onPressed: () => deleteUnit(unit["id"]),
-                                          icon: const Icon(Icons.delete, color: Colors.red),
-                                        ),
-                                      ],
-                                    )
-                                  ],
-                                ),
-                              );
-                            },
+                  filtered.isEmpty
+                      ? Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(40),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
                           ),
-                  ),
+                          child: const Column(
+                            children: [
+                              Icon(Icons.house_siding_rounded, size: 48, color: Colors.grey),
+                              SizedBox(height: 12),
+                              Text("No matching rental units found.", style: TextStyle(color: Colors.grey, fontSize: 16)),
+                            ],
+                          ),
+                        )
+                      : LayoutBuilder(
+                          builder: (context, constraints) {
+                            final int crossAxisCount = constraints.maxWidth < 650
+                                ? 1
+                                : (constraints.maxWidth < 1000 ? 2 : 3);
+                            return GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: filtered.length,
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: crossAxisCount,
+                                mainAxisSpacing: 16,
+                                crossAxisSpacing: 16,
+                                childAspectRatio: 1.3,
+                              ),
+                              itemBuilder: (context, index) {
+                                return _unitCard(filtered[index]);
+                              },
+                            );
+                          },
+                        ),
                 ],
               ),
             ),
@@ -380,18 +783,421 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
   }
 
   Widget _header() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(25),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(25),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1E3A8A), Color(0xFF2563EB)],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Rental Assets Inventory",
+          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          "Manage, filter, and track rooms, flats, and building structures.",
+          style: TextStyle(color: Colors.grey[600], fontSize: 14),
+        ),
+      ],
+    );
+  }
+
+  Widget _summaryCard(String title, int count, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 6,
+              backgroundColor: color,
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                Text("$count units", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              ],
+            ),
+          ],
         ),
       ),
-      child: const Text(
-        "Rental Asset Inventory",
-        style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+    );
+  }
+
+  Widget _filterBar() {
+    final Map<String, String> buildingMap = {};
+    for (var u in units) {
+      final bId = u["building_id"]?.toString();
+      final bName = u["building_name"]?.toString();
+      if (bId != null && bId.isNotEmpty) {
+        buildingMap[bId] = bName ?? "No Building";
+      }
+    }
+
+    final Map<String, String> flatMap = {};
+    for (var u in units) {
+      if (selectedBuildingId != null && u["building_id"]?.toString() != selectedBuildingId) continue;
+      if (selectedFloorId != null && u["floor_id"]?.toString() != selectedFloorId) continue;
+      final flId = u["flat_id"]?.toString();
+      final flNum = u["flat_number"]?.toString();
+      if (flId != null && flId.isNotEmpty) {
+        flatMap[flId] = "Flat $flNum";
+      }
+    }
+
+    final Map<String, String> roomMap = {};
+    for (var u in units) {
+      if (selectedBuildingId != null && u["building_id"]?.toString() != selectedBuildingId) continue;
+      if (selectedFloorId != null && u["floor_id"]?.toString() != selectedFloorId) continue;
+      if (selectedFlatId != null && u["flat_id"]?.toString() != selectedFlatId) continue;
+      final rId = u["room_id"]?.toString();
+      final rNum = u["room_number"]?.toString();
+      if (rId != null && rId.isNotEmpty) {
+        roomMap[rId] = "Room $rNum";
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search, color: Colors.grey, size: 20),
+                    hintText: "Search by building, flat, room...",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                  ),
+                  onChanged: (val) => setState(() => searchQuery = val),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF1F5F9),
+                  foregroundColor: const Color(0xFF334155),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () => setState(() => isFiltersExpanded = !isFiltersExpanded),
+                icon: Icon(isFiltersExpanded ? Icons.filter_list_off : Icons.filter_list, size: 18),
+                label: const Text("Filters", style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+          if (isFiltersExpanded) ...[
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 12),
+            LayoutBuilder(builder: (context, constraints) {
+              final isWide = constraints.maxWidth > 800;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  // Building dropdown
+                  SizedBox(
+                    width: isWide ? 180 : double.infinity,
+                    child: DropdownButtonFormField<String>(
+                      value: selectedBuildingId,
+                      decoration: const InputDecoration(labelText: "Building", border: OutlineInputBorder()),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text("All Buildings")),
+                        ...buildingMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
+                      ],
+                      onChanged: (val) {
+                        setState(() {
+                          selectedBuildingId = val;
+                          filterFloors = [];
+                        });
+                        if (val != null) {
+                          fetchFloorsForFilter(val);
+                        } else {
+                          setState(() {
+                            selectedFloorId = null;
+                            selectedFlatId = null;
+                            selectedRoomId = null;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+
+                  // Floor dropdown
+                  SizedBox(
+                    width: isWide ? 180 : double.infinity,
+                    child: isFilterFloorsLoading
+                        ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                        : DropdownButtonFormField<String>(
+                            value: selectedFloorId,
+                            decoration: const InputDecoration(labelText: "Floor", border: OutlineInputBorder()),
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text("All Floors")),
+                              ...filterFloors.map((f) {
+                                final dispName = f["floor_name"] != null && f["floor_name"].toString().isNotEmpty
+                                    ? f["floor_name"]
+                                    : "Floor ${f["floor_number"]}";
+                                return DropdownMenuItem(value: f["id"].toString(), child: Text(dispName.toString()));
+                              }),
+                            ],
+                            onChanged: (val) => setState(() {
+                              selectedFloorId = val;
+                              selectedFlatId = null;
+                              selectedRoomId = null;
+                            }),
+                          ),
+                  ),
+
+                  // Flat dropdown
+                  SizedBox(
+                    width: isWide ? 180 : double.infinity,
+                    child: DropdownButtonFormField<String>(
+                      value: selectedFlatId,
+                      decoration: const InputDecoration(labelText: "Flat", border: OutlineInputBorder()),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text("All Flats")),
+                        ...flatMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
+                      ],
+                      onChanged: (val) => setState(() {
+                        selectedFlatId = val;
+                        selectedRoomId = null;
+                      }),
+                    ),
+                  ),
+
+                  // Room dropdown
+                  SizedBox(
+                    width: isWide ? 180 : double.infinity,
+                    child: DropdownButtonFormField<String>(
+                      value: selectedRoomId,
+                      decoration: const InputDecoration(labelText: "Room", border: OutlineInputBorder()),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text("All Rooms")),
+                        ...roomMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
+                      ],
+                      onChanged: (val) => setState(() => selectedRoomId = val),
+                    ),
+                  ),
+
+                  // Status dropdown
+                  SizedBox(
+                    width: isWide ? 180 : double.infinity,
+                    child: DropdownButtonFormField<String>(
+                      value: selectedStatus,
+                      decoration: const InputDecoration(labelText: "Occupancy Status", border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: null, child: Text("All Status")),
+                        DropdownMenuItem(value: "vacant", child: Text("Vacant")),
+                        DropdownMenuItem(value: "partial", child: Text("Partial")),
+                        DropdownMenuItem(value: "occupied", child: Text("Occupied")),
+                      ],
+                      onChanged: (val) => setState(() => selectedStatus = val),
+                    ),
+                  ),
+
+                  // Occupancy Policy dropdown
+                  SizedBox(
+                    width: isWide ? 180 : double.infinity,
+                    child: DropdownButtonFormField<String>(
+                      value: filterOccupancyPolicy,
+                      decoration: const InputDecoration(labelText: "Occupancy Policy", border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: null, child: Text("All Policies")),
+                        DropdownMenuItem(value: "shared", child: Text("Shared Policy")),
+                        DropdownMenuItem(value: "exclusive", child: Text("Exclusive Policy")),
+                        DropdownMenuItem(value: "exclusive_occupied", child: Text("Exclusively Occupied")),
+                      ],
+                      onChanged: (val) => setState(() => filterOccupancyPolicy = val),
+                    ),
+                  ),
+
+                  // Sorting dropdown
+                  SizedBox(
+                    width: isWide ? 180 : double.infinity,
+                    child: DropdownButtonFormField<String>(
+                      value: selectedSort,
+                      decoration: const InputDecoration(labelText: "Sort By", border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: "recently_changed", child: Text("Recently Changed")),
+                        DropdownMenuItem(value: "newest", child: Text("Newest Added")),
+                        DropdownMenuItem(value: "oldest", child: Text("Oldest Added")),
+                      ],
+                      onChanged: (val) => setState(() => selectedSort = val!),
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _unitCard(Map unit) {
+    String designation = "Unit Block";
+    String detailsPath = "";
+
+    final String bName = unit["building_name"] ?? "";
+    final String fNum = unit["floor_number"]?.toString() ?? "";
+    final String flNum = unit["flat_number"] ?? "";
+    final String rNum = unit["room_number"] ?? "";
+
+    if (rNum.isNotEmpty) {
+      designation = "Room $rNum";
+      detailsPath = flNum.isNotEmpty ? "$bName > Floor $fNum > Flat $flNum" : "$bName > Floor $fNum";
+    } else if (flNum.isNotEmpty) {
+      designation = "Flat $flNum";
+      detailsPath = "$bName > Floor $fNum";
+    } else if (bName.isNotEmpty) {
+      designation = bName;
+      detailsPath = "Building Structure";
+    }
+
+    final int cap = unit["capacity"] ?? 1;
+    final int occ = unit["occupied_count"] ?? 0;
+    final String unitStatus = (unit["status"] ?? "vacant").toString().toLowerCase();
+    final String unitPolicy = (unit["occupancy_type"] ?? "shared").toString().toLowerCase();
+
+    Color statusColor = Colors.green;
+    if (unitStatus == "occupied") {
+      statusColor = Colors.red;
+    } else if (unitStatus == "partial") {
+      statusColor = Colors.orange;
+    }
+
+    // Determine sharing tag
+    final bool sharing = cap > 1;
+    final String policyLabel = unitPolicy == "exclusive" ? "EXCLUSIVE" : "SHARED";
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2F6),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  "${unit["unit_type"].toString().toUpperCase()} ($policyLabel)",
+                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  unitStatus.toUpperCase(),
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            designation,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            detailsPath,
+            style: TextStyle(color: Colors.grey[500], fontSize: 12),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (unit["exclusive_tenant_name"] != null && unit["exclusive_tenant_name"].toString().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.red[50],
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.red[100]!),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.star, size: 12, color: Colors.red),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      "Exclusive Tenant: ${unit["exclusive_tenant_name"]}",
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const Spacer(),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("₹${unit["rent"]} / mo", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A))),
+                  Text(
+                    sharing ? "Sharing Allowed ($occ/$cap)" : "Single Occupancy Only ($occ/$cap)",
+                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => openDialog(unit: unit),
+                    icon: const Icon(Icons.edit_outlined, color: Colors.blueAccent, size: 20),
+                    tooltip: "Edit Asset",
+                  ),
+                  IconButton(
+                    onPressed: () => confirmDeleteUnit(unit),
+                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                    tooltip: "Purge Asset",
+                  ),
+                ],
+              )
+            ],
+          ),
+        ],
       ),
     );
   }

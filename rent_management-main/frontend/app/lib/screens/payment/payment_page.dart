@@ -1,8 +1,6 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-
 import '../../layout/main_layout.dart';
 
 class PaymentsPage extends StatefulWidget {
@@ -22,57 +20,35 @@ class PaymentsPage extends StatefulWidget {
 }
 
 class _PaymentsPageState extends State<PaymentsPage> {
-  ////////////////////////////////////////////////////////////
-  /// BASE URL
-  ////////////////////////////////////////////////////////////
-
   final String baseUrl = "http://127.0.0.1:8000";
 
-  ////////////////////////////////////////////////////////////
-  /// CONTROLLERS
-  ////////////////////////////////////////////////////////////
-
-  final TextEditingController amountController = TextEditingController();
-  final TextEditingController utrController = TextEditingController();
-
-  ////////////////////////////////////////////////////////////
-  /// DATA
-  ////////////////////////////////////////////////////////////
-
   List bills = [];
-  List payments = [];
-  List transactions = [];
-
-  String? selectedBillId;
-  String? paymentMode;
-
   bool isLoading = true;
-  bool isSaving = false;
 
-  ////////////////////////////////////////////////////////////
-  /// INIT
-  ////////////////////////////////////////////////////////////
+  // Search & Filter state
+  final TextEditingController searchController = TextEditingController();
+  String searchQuery = "";
+  String paymentModeFilter = "all"; // all, cash, upi
 
   @override
   void initState() {
     super.initState();
     fetchBills();
-    fetchTransactions();
   }
 
-  ////////////////////////////////////////////////////////////
-  /// FETCH BILLS
-  ////////////////////////////////////////////////////////////
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
 
   Future<void> fetchBills() async {
+    setState(() => isLoading = true);
     try {
-      final res = await http.get(
-        Uri.parse("$baseUrl/api/bills/"),
-      );
-
+      final res = await http.get(Uri.parse("$baseUrl/api/bills/"));
       if (res.statusCode == 200) {
         setState(() {
-          bills = jsonDecode(res.body)["data"];
+          bills = jsonDecode(res.body)["data"] ?? [];
           isLoading = false;
         });
       }
@@ -81,175 +57,75 @@ class _PaymentsPageState extends State<PaymentsPage> {
     }
   }
 
-  ////////////////////////////////////////////////////////////
-  /// FETCH TRANSACTIONS
-  ////////////////////////////////////////////////////////////
-
-  Future<void> fetchTransactions() async {
-    try {
-      final res = await http.get(
-        Uri.parse("$baseUrl/api/payment-transactions/"),
-      );
-
-      if (res.statusCode == 200) {
-        setState(() {
-          transactions = jsonDecode(res.body)["data"];
-        });
-      }
-    } catch (e) {}
-  }
-
-  ////////////////////////////////////////////////////////////
-  /// MAKE PAYMENT
-  ////////////////////////////////////////////////////////////
-
-  Future<void> makePayment() async {
-    if (selectedBillId == null || amountController.text.isEmpty) {
-      return;
-    }
-
-    setState(() => isSaving = true);
-
-    try {
-      final res = await http.post(
-        Uri.parse("$baseUrl/api/create-payment/"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "bill_id": selectedBillId,
-          "amount_paid": amountController.text,
-          "payment_mode": paymentMode ?? "cash",
-          "utr_number": utrController.text,
-          "received_by": null
-        }),
-      );
-
-      if (res.statusCode == 200) {
-        Navigator.pop(context);
-        amountController.clear();
-        utrController.clear();
-        fetchBills();
-      }
-    } catch (e) {}
-
-    setState(() => isSaving = false);
-  }
-
-  ////////////////////////////////////////////////////////////
-  /// DELETE PAYMENT
-  ////////////////////////////////////////////////////////////
-
-  Future<void> deletePayment(String id) async {
-    try {
-      await http.delete(
-        Uri.parse("$baseUrl/api/delete-payment/$id/"),
-      );
-
-      fetchBills();
-    } catch (e) {}
-  }
-
-  ////////////////////////////////////////////////////////////
-  /// PAYMENT DIALOG
-  ////////////////////////////////////////////////////////////
-
-  void openPaymentDialog(Map bill) {
-    selectedBillId = bill["id"];
-
-    showDialog(
+  Future<void> deletePayment(String paymentId) async {
+    if (paymentId.isEmpty) return;
+    
+    // Show confirm dialog
+    bool confirm = await showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text("Pay Bill - ${bill["tenant_name"]}"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text("Total: ${bill["total_amount"]}"),
-            Text("Due: ${bill["status"]}"),
-
-            const SizedBox(height: 10),
-
-            TextField(
-              controller: amountController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: "Amount Paid",
-              ),
-            ),
-
-            TextField(
-              controller: utrController,
-              decoration: const InputDecoration(
-                labelText: "UTR / Reference",
-              ),
-            ),
-
-            DropdownButtonFormField(
-              value: paymentMode,
-              items: const [
-                DropdownMenuItem(
-                  value: "cash",
-                  child: Text("Cash"),
-                ),
-                DropdownMenuItem(
-                  value: "upi",
-                  child: Text("UPI"),
-                ),
-                DropdownMenuItem(
-                  value: "bank",
-                  child: Text("Bank Transfer"),
-                ),
-              ],
-              onChanged: (v) {
-                paymentMode = v.toString();
-              },
-              decoration: const InputDecoration(
-                labelText: "Payment Mode",
-              ),
-            ),
-          ],
-        ),
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text("Delete Payment Entry"),
+        content: const Text("Are you sure you want to delete this payment record? The associated bill will revert to pending status."),
         actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            onPressed: isSaving ? null : makePayment,
-            child: const Text("Pay"),
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text("Delete"),
           ),
         ],
       ),
-    );
+    ) ?? false;
+
+    if (!confirm) return;
+
+    setState(() => isLoading = true);
+    try {
+      final res = await http.delete(Uri.parse("$baseUrl/api/payments/$paymentId/delete/"));
+      if (res.statusCode == 200 || res.statusCode == 204) {
+        fetchBills();
+      } else {
+        setState(() => isLoading = false);
+      }
+    } catch (e) {
+      setState(() => isLoading = false);
+    }
   }
 
-  ////////////////////////////////////////////////////////////
-  /// TRANSACTION VIEW
-  ////////////////////////////////////////////////////////////
+  List getPaidBills() {
+    return bills.where((b) {
+      // 1. Must be PAID
+      if (b["status"] != "paid") return false;
 
-  void showTransactions() {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) {
-        return ListView(
-          children: transactions.map((t) {
-            return ListTile(
-              title: Text("₹${t["amount"]} - ${t["tenant_name"]}"),
-              subtitle: Text(
-                "${t["gateway_name"]} | ${t["transaction_status"]}",
-              ),
-              trailing: Text(t["created_at"]),
-            );
-          }).toList(),
-        );
-      },
-    );
+      // 2. Search filter (Tenant Name & Mobile No)
+      final name = b["tenant_name"].toString().toLowerCase();
+      final phone = b["tenant_phone"].toString().toLowerCase();
+      final query = searchQuery.toLowerCase();
+      if (!name.contains(query) && !phone.contains(query)) {
+        return false;
+      }
+
+      // 3. Payment Mode filter
+      final mode = b["payment_mode"].toString().toLowerCase();
+      if (paymentModeFilter != "all" && mode != paymentModeFilter) {
+        return false;
+      }
+
+      return true;
+    }).toList();
   }
-
-  ////////////////////////////////////////////////////////////
-  /// UI
-  ////////////////////////////////////////////////////////////
 
   @override
   Widget build(BuildContext context) {
+    final paidList = getPaidBills();
+
+    // Calculate total collection amount for the filtered set
+    double totalCollection = 0;
+    for (var b in paidList) {
+      totalCollection += b["total_amount"];
+    }
+
     return MainLayout(
       role: widget.role,
       userName: widget.userName,
@@ -257,108 +133,189 @@ class _PaymentsPageState extends State<PaymentsPage> {
       currentIndex: 10,
       child: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                //////////////////////////////////////////////////////
-                /// HEADER
-                //////////////////////////////////////////////////////
-
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  color: Colors.blue,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Payments",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                        ),
-                      ),
-
-                      ElevatedButton(
-                        onPressed: showTransactions,
-                        child: const Text("Transactions"),
-                      )
-                    ],
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // PAGE TITLE
+                  const Text(
+                    "Collection Ledger",
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                   ),
-                ),
+                  const SizedBox(height: 15),
 
-                //////////////////////////////////////////////////////
-                /// BILL LIST
-                //////////////////////////////////////////////////////
-
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: bills.length,
-                    itemBuilder: (context, index) {
-                      final b = bills[index];
-
-                      Color statusColor;
-
-                      switch (b["status"]) {
-                        case "paid":
-                          statusColor = Colors.green;
-                          break;
-                        case "partial":
-                          statusColor = Colors.orange;
-                          break;
-                        default:
-                          statusColor = Colors.red;
-                      }
-
-                      return Card(
-                        margin: const EdgeInsets.all(10),
-                        child: ListTile(
-                          title: Text(b["tenant_name"]),
-                          subtitle: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                  // TOTAL LEDGER CARD
+                  Card(
+                    color: Colors.blue.shade50,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(18.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text("Total: ₹${b["total_amount"]}"),
-                              Text(
-                                "Status: ${b["status"]}",
-                                style: TextStyle(
-                                  color: statusColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                              Text("TOTAL RECORDED COLLECTION", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue.shade800)),
+                              const SizedBox(height: 6),
+                              Text("₹${totalCollection.toStringAsFixed(1)}", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue.shade900)),
                             ],
                           ),
-
-                          trailing: widget.role == "tenant"
-                              ? null
-                              : PopupMenuButton(
-                                  itemBuilder: (_) => [
-                                    PopupMenuItem(
-                                      child: const Text("Pay"),
-                                      onTap: () {
-                                        Future.delayed(
-                                          Duration.zero,
-                                          () => openPaymentDialog(b),
-                                        );
-                                      },
-                                    ),
-                                    PopupMenuItem(
-                                      child: const Text("Delete Payment"),
-                                      onTap: () {
-                                        if (b["latest_payment_id"] != null) {
-                                          deletePayment(
-                                            b["latest_payment_id"],
-                                          );
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      );
-                    },
+                          const Icon(Icons.account_balance_wallet, size: 40, color: Colors.blue),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 15),
+
+                  // SEARCH & FILTERS CONTAINER
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)],
+                    ),
+                    child: Column(
+                      children: [
+                        // Search Input
+                        TextField(
+                          controller: searchController,
+                          onChanged: (v) => setState(() => searchQuery = v),
+                          decoration: InputDecoration(
+                            hintText: "Search payments by tenant or mobile number...",
+                            prefixIcon: const Icon(Icons.search),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 15),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Mode Chips Filter
+                        Row(
+                          children: [
+                            const Text("Payment Mode: ", style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(width: 8),
+                            ChoiceChip(
+                              label: const Text("All"),
+                              selected: paymentModeFilter == "all",
+                              onSelected: (s) => setState(() => paymentModeFilter = "all"),
+                            ),
+                            const SizedBox(width: 8),
+                            ChoiceChip(
+                              label: const Text("Cash"),
+                              selected: paymentModeFilter == "cash",
+                              onSelected: (s) => setState(() => paymentModeFilter = "cash"),
+                            ),
+                            const SizedBox(width: 8),
+                            ChoiceChip(
+                              label: const Text("UPI / Online"),
+                              selected: paymentModeFilter == "upi",
+                              onSelected: (s) => setState(() => paymentModeFilter = "upi"),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+
+                  // LEDGER LIST
+                  Expanded(
+                    child: paidList.isEmpty
+                        ? const Center(child: Text("No payment collections found."))
+                        : ListView.builder(
+                            itemCount: paidList.length,
+                            itemBuilder: (context, index) {
+                              final b = paidList[index];
+                              final isCash = b["payment_mode"] == "cash";
+
+                              // Designations (Room/Flat details)
+                              String designation = "Suite";
+                              if (b["room_number"] != null && b["room_number"].toString().isNotEmpty) {
+                                designation = "Room ${b["room_number"]}";
+                              } else if (b["flat_number"] != null && b["flat_number"].toString().isNotEmpty) {
+                                designation = "Flat ${b["flat_number"]}";
+                              }
+
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(15.0),
+                                  child: Row(
+                                    children: [
+                                      // Left side Payment mode Icon
+                                      CircleAvatar(
+                                        radius: 24,
+                                        backgroundColor: (isCash ? Colors.green : Colors.blue).withOpacity(0.12),
+                                        child: Icon(
+                                          isCash ? Icons.money : Icons.phone_android,
+                                          color: isCash ? Colors.green : Colors.blue,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 15),
+
+                                      // Main description
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              b["tenant_name"],
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              "${b["building_name"] ?? ''} • $designation • Mob: ${b["tenant_phone"] ?? ''}",
+                                              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              "Billing month: ${b["bill_month"].toString().substring(0, 7)}",
+                                              style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                                            ),
+                                            if (!isCash && b["utr_number"].toString().isNotEmpty)
+                                              Text(
+                                                "UTR: ${b["utr_number"]}",
+                                                style: const TextStyle(color: Colors.blueGrey, fontSize: 12, fontWeight: FontWeight.w600),
+                                              ),
+                                            Text(
+                                              "Received at: ${b["paid_at"]}",
+                                              style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+
+                                      // Amount & deletion action
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            "₹${b["total_amount"]}",
+                                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
+                                          ),
+                                          if (widget.role != "tenant") ...[
+                                            const SizedBox(height: 10),
+                                            IconButton(
+                                              icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
+                                              onPressed: () => deletePayment(b["payment_id"]),
+                                              tooltip: "Delete Payment Record",
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
             ),
     );
   }
