@@ -811,6 +811,7 @@ class _ElectricityPageState extends State<ElectricityPage> {
                                     ],
                                   ),
                                 ),
+                              );
                             },
                           ),
                 ],
