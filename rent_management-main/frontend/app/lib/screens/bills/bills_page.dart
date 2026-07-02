@@ -592,14 +592,13 @@ class _BillsPageState extends State<BillsPage> {
                               style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                             ),
                             const SizedBox(height: 12),
-                            Row(
+                            Column(
                               children: [
-                                Expanded(
-                                  child: _buildReportOptionsButton(context, isFullWidth: true),
-                                ),
+                                _buildReportOptionsButton(context, isFullWidth: true),
                                 if (widget.role != "tenant") ...[
-                                  const SizedBox(width: 10),
-                                  Expanded(
+                                  const SizedBox(height: 10),
+                                  SizedBox(
+                                    width: double.infinity,
                                     child: ElevatedButton.icon(
                                       onPressed: openBillGenerationDialog,
                                       icon: const Icon(Icons.add),
@@ -950,19 +949,24 @@ class _BillsPageState extends State<BillsPage> {
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                b["tenant_name"],
-                                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                                              ),
-                                              Text(
-                                                "${b["building_name"] ?? ''} • $designation • Mob: ${b["tenant_phone"] ?? ''}",
-                                                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                                              ),
-                                            ],
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  b["tenant_name"],
+                                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                Text(
+                                                  "${b["building_name"] ?? ''} • $designation • Mob: ${b["tenant_phone"] ?? ''}",
+                                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
                                           ),
+                                          const SizedBox(width: 10),
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                             decoration: BoxDecoration(

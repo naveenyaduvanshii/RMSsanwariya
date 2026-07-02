@@ -281,14 +281,26 @@ class _DocumentsPageState extends State<DocumentsPage> {
                             const EdgeInsets.only(bottom: 12),
                         child: ListTile(
                           leading: const Icon(Icons.file_copy),
-                          title: Text(d["document_name"]),
+                           title: Text(
+                            d["document_name"],
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           subtitle: Column(
                             crossAxisAlignment:
                                 CrossAxisAlignment.start,
                             children: [
-                              Text("Type: ${d["document_type"]}"),
-                              Text("Tenant: ${d["tenant_name"]}"),
-                              Text("Uploaded: ${d["uploaded_at"]}"),
+                              Text(
+                                "Type: ${d["document_type"]}",
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                "Tenant: ${d["tenant_name"]}",
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                "Uploaded: ${d["uploaded_at"]}",
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ],
                           ),
                           trailing: Row(

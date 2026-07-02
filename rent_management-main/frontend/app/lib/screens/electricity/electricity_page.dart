@@ -494,14 +494,13 @@ class _ElectricityPageState extends State<ElectricityPage> {
                               style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
                             ),
                             const SizedBox(height: 12),
-                            Row(
+                            Column(
                               children: [
-                                Expanded(
-                                  child: _buildReportOptionsButton(context, isFullWidth: true),
-                                ),
+                                _buildReportOptionsButton(context, isFullWidth: true),
                                 if (widget.role != "tenant") ...[
-                                  const SizedBox(width: 10),
-                                  Expanded(
+                                  const SizedBox(height: 10),
+                                  SizedBox(
+                                    width: double.infinity,
                                     child: ElevatedButton.icon(
                                       icon: const Icon(Icons.add),
                                       label: const Text("Log Meter Entry"),

@@ -133,7 +133,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
       currentIndex: 10,
       child: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
+          : SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,98 +222,103 @@ class _PaymentsPageState extends State<PaymentsPage> {
                   const SizedBox(height: 15),
 
                   // LEDGER LIST
-                  Expanded(
-                    child: paidList.isEmpty
-                        ? const Center(child: Text("No payment collections found."))
-                        : ListView.builder(
-                            itemCount: paidList.length,
-                            itemBuilder: (context, index) {
-                              final b = paidList[index];
-                              final isCash = b["payment_mode"] == "cash";
+                  paidList.isEmpty
+                      ? const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Text("No payment collections found.")))
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: paidList.length,
+                          itemBuilder: (context, index) {
+                            final b = paidList[index];
+                            final isCash = b["payment_mode"] == "cash";
 
-                              // Designations (Room/Flat details)
-                              String designation = "Suite";
-                              if (b["room_number"] != null && b["room_number"].toString().isNotEmpty) {
-                                designation = "Room ${b["room_number"]}";
-                              } else if (b["flat_number"] != null && b["flat_number"].toString().isNotEmpty) {
-                                designation = "Flat ${b["flat_number"]}";
-                              }
+                            // Designations (Room/Flat details)
+                            String designation = "Suite";
+                            if (b["room_number"] != null && b["room_number"].toString().isNotEmpty) {
+                              designation = "Room ${b["room_number"]}";
+                            } else if (b["flat_number"] != null && b["flat_number"].toString().isNotEmpty) {
+                              designation = "Flat ${b["flat_number"]}";
+                            }
 
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(15.0),
-                                  child: Row(
-                                    children: [
-                                      // Left side Payment mode Icon
-                                      CircleAvatar(
-                                        radius: 24,
-                                        backgroundColor: (isCash ? Colors.green : Colors.blue).withOpacity(0.12),
-                                        child: Icon(
-                                          isCash ? Icons.money : Icons.phone_android,
-                                          color: isCash ? Colors.green : Colors.blue,
-                                        ),
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              child: Padding(
+                                padding: const EdgeInsets.all(15.0),
+                                child: Row(
+                                  children: [
+                                    // Left side Payment mode Icon
+                                    CircleAvatar(
+                                      radius: 24,
+                                      backgroundColor: (isCash ? Colors.green : Colors.blue).withOpacity(0.12),
+                                      child: Icon(
+                                        isCash ? Icons.money : Icons.phone_android,
+                                        color: isCash ? Colors.green : Colors.blue,
                                       ),
-                                      const SizedBox(width: 15),
+                                    ),
+                                    const SizedBox(width: 15),
 
-                                      // Main description
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              b["tenant_name"],
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              "${b["building_name"] ?? ''} • $designation • Mob: ${b["tenant_phone"] ?? ''}",
-                                              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              "Billing month: ${b["bill_month"].toString().substring(0, 7)}",
-                                              style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
-                                            ),
-                                            if (!isCash && b["utr_number"].toString().isNotEmpty)
-                                              Text(
-                                                "UTR: ${b["utr_number"]}",
-                                                style: const TextStyle(color: Colors.blueGrey, fontSize: 12, fontWeight: FontWeight.w600),
-                                              ),
-                                            Text(
-                                              "Received at: ${b["paid_at"]}",
-                                              style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-
-                                      // Amount & deletion action
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                    // Main description
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            "₹${b["total_amount"]}",
-                                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
+                                            b["tenant_name"],
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                          if (widget.role != "tenant") ...[
-                                            const SizedBox(height: 10),
-                                            IconButton(
-                                              icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
-                                              onPressed: () => deletePayment(b["payment_id"]),
-                                              tooltip: "Delete Payment Record",
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            "${b["building_name"] ?? ''} • $designation • Mob: ${b["tenant_phone"] ?? ''}",
+                                            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            "Billing month: ${b["bill_month"].toString().substring(0, 7)}",
+                                            style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (!isCash && b["utr_number"].toString().isNotEmpty)
+                                            Text(
+                                              "UTR: ${b["utr_number"]}",
+                                              style: const TextStyle(color: Colors.blueGrey, fontSize: 12, fontWeight: FontWeight.w600),
+                                              overflow: TextOverflow.ellipsis,
                                             ),
-                                          ],
+                                          Text(
+                                            "Received at: ${b["paid_at"]}",
+                                            style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ],
                                       ),
-                                    ],
-                                  ),
+                                    ),
+
+                                    // Amount & deletion action
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          "₹${b["total_amount"]}",
+                                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
+                                        ),
+                                        if (widget.role != "tenant") ...[
+                                          const SizedBox(height: 10),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
+                                            onPressed: () => deletePayment(b["payment_id"]),
+                                            tooltip: "Delete Payment Record",
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
                                 ),
-                              );
-                            },
-                          ),
-                  ),
+                              ),
+                            );
+                          },
+                        ),
                 ],
               ),
             ),

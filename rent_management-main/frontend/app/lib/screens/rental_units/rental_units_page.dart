@@ -460,10 +460,10 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
                       DropdownButtonFormField<String>(
                         value: selectedOccupancyType,
                         decoration: const InputDecoration(labelText: "Unit Policy", border: OutlineInputBorder()),
-                        items: const [
-                          DropdownMenuItem(value: "shared", child: Text("Shared Policy (Multiple Tenants Allowed)")),
-                          DropdownMenuItem(value: "exclusive", child: Text("Exclusive Policy (Dedicated to Single Tenant)")),
-                        ],
+                         items: const [
+                           DropdownMenuItem(value: "shared", child: Text("Shared Policy")),
+                           DropdownMenuItem(value: "exclusive", child: Text("Exclusive Policy")),
+                         ],
                         onChanged: (val) => setDialogState(() => selectedOccupancyType = val!),
                       ),
                       const Divider(height: 24),
@@ -922,34 +922,51 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
       ),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search, color: Colors.grey, size: 20),
-                    hintText: "Search by building, flat, room...",
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                    filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isSmall = constraints.maxWidth < 450;
+              return Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.search, color: Colors.grey, size: 20),
+                        hintText: isSmall ? "Search..." : "Search by building, flat, room...",
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                      ),
+                      onChanged: (val) => setState(() => searchQuery = val),
+                    ),
                   ),
-                  onChanged: (val) => setState(() => searchQuery = val),
-                ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF1F5F9),
-                  foregroundColor: const Color(0xFF334155),
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                onPressed: () => setState(() => isFiltersExpanded = !isFiltersExpanded),
-                icon: Icon(isFiltersExpanded ? Icons.filter_list_off : Icons.filter_list, size: 18),
-                label: const Text("Filters", style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
-            ],
+                  const SizedBox(width: 12),
+                  if (isSmall)
+                    IconButton(
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        foregroundColor: const Color(0xFF334155),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.all(14),
+                      ),
+                      onPressed: () => setState(() => isFiltersExpanded = !isFiltersExpanded),
+                      icon: Icon(isFiltersExpanded ? Icons.filter_list_off : Icons.filter_list, size: 18),
+                    )
+                  else
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        foregroundColor: const Color(0xFF334155),
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => setState(() => isFiltersExpanded = !isFiltersExpanded),
+                      icon: Icon(isFiltersExpanded ? Icons.filter_list_off : Icons.filter_list, size: 18),
+                      label: const Text("Filters", style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                ],
+              );
+            }
           ),
           if (isFiltersExpanded) ...[
             const SizedBox(height: 16),
@@ -1248,16 +1265,21 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("₹${unit["rent"]} / mo", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A))),
-                  Text(
-                    sharing ? "Sharing Allowed ($occ/$cap)" : "Single Occupancy Only ($occ/$cap)",
-                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("₹${unit["rent"]} / mo", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A))),
+                    Text(
+                      sharing ? "Sharing ($occ/$cap)" : "Single ($occ/$cap)",
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Row(
                 children: [
                   IconButton(

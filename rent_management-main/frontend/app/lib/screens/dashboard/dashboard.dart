@@ -348,58 +348,73 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildMetricsGrid(double screenWidth) {
     if (widget.role == "tenant") {
-      int crossAxisCount = screenWidth < 600 ? 1 : 3;
-      double aspectRatio = screenWidth < 600 ? 2.0 : 1.8;
-
       final rent = dashboardData?["rent"] ?? "0";
       final unitType = dashboardData?["unit_type"] ?? "N/A";
       final pendingBills = dashboardData?["pending_bills"] ?? 0;
       final complaints = dashboardData?["complaints"] ?? 0;
 
+      final monthlyRentCard = MetricCard(
+        title: "MONTHLY RENT",
+        value: "₹$rent",
+        icon: Icons.currency_rupee,
+        color: const Color(0xFF3B82F6),
+        bottomWidget: Text(
+          "Unit Type: ${unitType.toString().toUpperCase()}",
+          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+        ),
+      );
+
+      final pendingBillsCard = MetricCard(
+        title: "PENDING BILLS",
+        value: pendingBills.toString(),
+        icon: Icons.warning_amber_rounded,
+        color: pendingBills > 0 ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+        bottomWidget: Text(
+          pendingBills > 0 ? "Action required" : "All clear",
+          style: TextStyle(
+            fontSize: 11,
+            color: pendingBills > 0 ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+
+      final activeRequestsCard = MetricCard(
+        title: "ACTIVE REQUESTS",
+        value: complaints.toString(),
+        icon: Icons.forum_outlined,
+        color: const Color(0xFF8B5CF6),
+        bottomWidget: const Text(
+          "Maintenance & complaints",
+          style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+        ),
+      );
+
+      if (screenWidth < 600) {
+        return Column(
+          children: [
+            monthlyRentCard,
+            const SizedBox(height: 16),
+            pendingBillsCard,
+            const SizedBox(height: 16),
+            activeRequestsCard,
+          ],
+        );
+      }
+
       return GridView(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: crossAxisCount,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
-          childAspectRatio: aspectRatio,
+          childAspectRatio: 1.8,
         ),
         children: [
-          MetricCard(
-            title: "MONTHLY RENT",
-            value: "₹$rent",
-            icon: Icons.currency_rupee,
-            color: const Color(0xFF3B82F6),
-            bottomWidget: Text(
-              "Unit Type: ${unitType.toString().toUpperCase()}",
-              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-            ),
-          ),
-          MetricCard(
-            title: "PENDING BILLS",
-            value: pendingBills.toString(),
-            icon: Icons.warning_amber_rounded,
-            color: pendingBills > 0 ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-            bottomWidget: Text(
-              pendingBills > 0 ? "Action required" : "All clear",
-              style: TextStyle(
-                fontSize: 11,
-                color: pendingBills > 0 ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          MetricCard(
-            title: "ACTIVE REQUESTS",
-            value: complaints.toString(),
-            icon: Icons.forum_outlined,
-            color: const Color(0xFF8B5CF6),
-            bottomWidget: const Text(
-              "Maintenance & complaints",
-              style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-            ),
-          ),
+          monthlyRentCard,
+          pendingBillsCard,
+          activeRequestsCard,
         ],
       );
     } else {
@@ -412,8 +427,75 @@ class _DashboardPageState extends State<DashboardPage> {
       final totalUnits = occupied + vacant;
       final occupancyRate = totalUnits > 0 ? (occupied / totalUnits) : 0.0;
 
-      int crossAxisCount = screenWidth < 700 ? 1 : (screenWidth < 1100 ? 2 : 3);
-      double aspectRatio = screenWidth < 700 ? 2.0 : 1.7;
+      final monthlyRevenueCard = MetricCard(
+        title: "MONTHLY REVENUE",
+        value: "₹$revenue",
+        icon: Icons.payments_outlined,
+        color: const Color(0xFF10B981),
+        bottomWidget: const Text(
+          "Current Month Collection",
+          style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+        ),
+      );
+
+      final occupancyRateCard = MetricCard(
+        title: "OCCUPANCY RATE",
+        value: "${(occupancyRate * 100).toStringAsFixed(0)}%",
+        icon: Icons.home_work_outlined,
+        color: const Color(0xFF3B82F6),
+        bottomWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: occupancyRate,
+                backgroundColor: const Color(0xFFE2E8F0),
+                color: const Color(0xFF3B82F6),
+                minHeight: 6,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "$occupied occupied / $totalUnits total units",
+              style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+
+      final activeTenantsCard = MetricCard(
+        title: "ACTIVE TENANTS & BILLS",
+        value: tenantsCount.toString(),
+        icon: Icons.people_outline,
+        color: const Color(0xFFF59E0B),
+        bottomWidget: Text(
+          "$pendingBills pending bills",
+          style: const TextStyle(
+            fontSize: 11,
+            color: Color(0xFFEF4444),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+
+      if (screenWidth < 700) {
+        return Column(
+          children: [
+            monthlyRevenueCard,
+            const SizedBox(height: 16),
+            occupancyRateCard,
+            const SizedBox(height: 16),
+            activeTenantsCard,
+            const SizedBox(height: 16),
+            _buildPropertySummaryCard(),
+          ],
+        );
+      }
+
+      int crossAxisCount = screenWidth < 1100 ? 2 : 3;
+      double aspectRatio = 1.7;
 
       return Column(
         children: [
@@ -427,56 +509,9 @@ class _DashboardPageState extends State<DashboardPage> {
               childAspectRatio: aspectRatio,
             ),
             children: [
-              MetricCard(
-                title: "MONTHLY REVENUE",
-                value: "₹$revenue",
-                icon: Icons.payments_outlined,
-                color: const Color(0xFF10B981),
-                bottomWidget: const Text(
-                  "Current Month Collection",
-                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-                ),
-              ),
-              MetricCard(
-                title: "OCCUPANCY RATE",
-                value: "${(occupancyRate * 100).toStringAsFixed(0)}%",
-                icon: Icons.home_work_outlined,
-                color: const Color(0xFF3B82F6),
-                bottomWidget: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 4),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: occupancyRate,
-                        backgroundColor: const Color(0xFFE2E8F0),
-                        color: const Color(0xFF3B82F6),
-                        minHeight: 6,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "$occupied occupied / $totalUnits total units",
-                      style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-                    ),
-                  ],
-                ),
-              ),
-              MetricCard(
-                title: "ACTIVE TENANTS & BILLS",
-                value: tenantsCount.toString(),
-                icon: Icons.people_outline,
-                color: const Color(0xFFF59E0B),
-                bottomWidget: Text(
-                  "$pendingBills pending bills",
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFFEF4444),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+              monthlyRevenueCard,
+              occupancyRateCard,
+              activeTenantsCard,
             ],
           ),
           const SizedBox(height: 16),

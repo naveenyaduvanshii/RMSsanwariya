@@ -220,10 +220,16 @@ class _TenantsPageState extends State<TenantsPage> {
                         itemBuilder: (context, index) {
                           final t = filteredTenants[index];
 
-                          return Card(
-                            child: ListTile(
-                              title: Text((t["name"] ?? "").toString()),
-                              subtitle: Text("${t["phone"] ?? ""} | ${t["email"] ?? ""}"),
+                           return Card(
+                             child: ListTile(
+                               title: Text(
+                                 (t["name"] ?? "").toString(),
+                                 overflow: TextOverflow.ellipsis,
+                               ),
+                               subtitle: Text(
+                                 "${t["phone"] ?? ""} | ${t["email"] ?? ""}",
+                                 overflow: TextOverflow.ellipsis,
+                               ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [

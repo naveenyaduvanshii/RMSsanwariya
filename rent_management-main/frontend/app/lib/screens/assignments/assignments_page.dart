@@ -585,6 +585,32 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
                       ),
                       const SizedBox(height: 15),
                       if (!isEdit) ...[
+                      if (MediaQuery.of(context).size.width < 500) ...[
+                        DropdownButtonFormField<String>(
+                          value: dialogSelectedBuilding,
+                          decoration: const InputDecoration(labelText: "Building Filter", border: OutlineInputBorder()),
+                          items: [
+                            const DropdownMenuItem<String>(value: null, child: Text("All")),
+                            ...buildingMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
+                          ],
+                          onChanged: (val) {
+                            setDialogState(() {
+                              dialogSelectedBuilding = val;
+                              dialogSelectedFloor = null;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: dialogSelectedFloor,
+                          decoration: const InputDecoration(labelText: "Floor Filter", border: OutlineInputBorder()),
+                          items: [
+                            const DropdownMenuItem<String>(value: null, child: Text("All")),
+                            ...floorMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
+                          ],
+                          onChanged: (val) => setDialogState(() => dialogSelectedFloor = val),
+                        ),
+                      ] else ...[
                         Row(
                           children: [
                             Expanded(
@@ -617,6 +643,7 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
                             ),
                           ],
                         ),
+                      ],
                         const SizedBox(height: 15),
                       ],
                       DropdownButtonFormField<String>(
@@ -872,21 +899,30 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(
-                assignment["exclusive_occupancy"] == true ? Icons.lock_outline : Icons.groups_outlined,
-                size: 14,
-                color: assignment["exclusive_occupancy"] == true ? Colors.red.shade400 : Colors.green.shade400,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                assignment["exclusive_occupancy"] == true ? "Exclusive Occupancy" : "Shared Occupancy",
-                style: TextStyle(
-                  fontSize: 11,
-                  color: assignment["exclusive_occupancy"] == true ? Colors.red.shade700 : Colors.green.shade700,
-                  fontWeight: FontWeight.w500,
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      assignment["exclusive_occupancy"] == true ? Icons.lock_outline : Icons.groups_outlined,
+                      size: 14,
+                      color: assignment["exclusive_occupancy"] == true ? Colors.red.shade400 : Colors.green.shade400,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        assignment["exclusive_occupancy"] == true ? "Exclusive" : "Shared",
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: assignment["exclusive_occupancy"] == true ? Colors.red.shade700 : Colors.green.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 6),
               if (widget.role == "owner" || widget.role == "manager") ...[
                 IconButton(
                   icon: const Icon(Icons.edit_outlined, color: Colors.blue, size: 18),
@@ -1048,31 +1084,48 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
   }
 
   Widget _buildSearchAndToggleRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: searchController,
-            onChanged: (_) => applyFilters(),
-            decoration: InputDecoration(
-              hintText: "Search by tenant, phone, flat, room...",
-              prefixIcon: const Icon(Icons.search, size: 20),
-              contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isSmall = constraints.maxWidth < 450;
+        return Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: searchController,
+                onChanged: (_) => applyFilters(),
+                decoration: InputDecoration(
+                  hintText: isSmall ? "Search..." : "Search by tenant, phone, flat, room...",
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        OutlinedButton.icon(
-          onPressed: () => setState(() => showFilters = !showFilters),
-          icon: Icon(showFilters ? Icons.filter_alt_off : Icons.filter_alt_outlined, size: 18),
-          label: Text(showFilters ? "Hide Filters" : "Filters"),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        ),
-      ],
+            const SizedBox(width: 10),
+            if (isSmall)
+              IconButton(
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xFFF1F5F9),
+                  foregroundColor: const Color(0xFF334155),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.all(14),
+                ),
+                onPressed: () => setState(() => showFilters = !showFilters),
+                icon: Icon(showFilters ? Icons.filter_alt_off : Icons.filter_alt_outlined, size: 18),
+              )
+            else
+              OutlinedButton.icon(
+                onPressed: () => setState(() => showFilters = !showFilters),
+                icon: Icon(showFilters ? Icons.filter_alt_off : Icons.filter_alt_outlined, size: 18),
+                label: Text(showFilters ? "Hide Filters" : "Filters"),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+          ],
+        );
+      }
     );
   }
 
