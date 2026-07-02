@@ -847,6 +847,7 @@ class _RoomsPageState extends State<RoomsPage> {
                         final buildingFilter = SizedBox(
                           width: 180,
                           child: DropdownButtonFormField<String>(
+                            isExpanded: true,
                             value: buildings.any((e) => e["id"].toString() == selectedBuilding) ? selectedBuilding : null,
                             decoration: const InputDecoration(
                               labelText: "Building",
@@ -855,7 +856,10 @@ class _RoomsPageState extends State<RoomsPage> {
                             items: buildings.map((b) {
                               return DropdownMenuItem<String>(
                                 value: b["id"].toString(),
-                                child: Text(b["name"].toString()),
+                                child: Text(
+                                  b["name"].toString(),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               );
                             }).toList(),
                             onChanged: (value) async {
@@ -875,6 +879,7 @@ class _RoomsPageState extends State<RoomsPage> {
                         final floorFilter = SizedBox(
                           width: 150,
                           child: DropdownButtonFormField<String>(
+                            isExpanded: true,
                             value: floors.any((e) => e["id"].toString() == selectedFloor) ? selectedFloor : null,
                             decoration: const InputDecoration(
                               labelText: "Floor",
@@ -883,7 +888,10 @@ class _RoomsPageState extends State<RoomsPage> {
                             items: floors.map((f) {
                               return DropdownMenuItem<String>(
                                 value: f["id"].toString(),
-                                child: Text(f["floor_name"]?.toString() ?? "Floor ${f["floor_number"]}"),
+                                child: Text(
+                                  f["floor_name"]?.toString() ?? "Floor ${f["floor_number"]}",
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               );
                             }).toList(),
                             onChanged: (value) async {
@@ -901,6 +909,7 @@ class _RoomsPageState extends State<RoomsPage> {
                         final flatFilter = SizedBox(
                           width: 150,
                           child: DropdownButtonFormField<String>(
+                            isExpanded: true,
                             value: flats.any((e) => e["id"].toString() == selectedFlat) ? selectedFlat : null,
                             decoration: const InputDecoration(
                               labelText: "Flat",
@@ -909,7 +918,10 @@ class _RoomsPageState extends State<RoomsPage> {
                             items: flats.map((f) {
                               return DropdownMenuItem<String>(
                                 value: f["id"].toString(),
-                                child: Text(f["flat_number"].toString()),
+                                child: Text(
+                                  f["flat_number"].toString(),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               );
                             }).toList(),
                             onChanged: (value) {
@@ -1042,52 +1054,39 @@ class _RoomsPageState extends State<RoomsPage> {
 
                                           children: [
                                             Text(
-                                              room["room_number"]
-                                                      ?.toString() ??
-                                                  "",
-
-                                              style:
-                                                  const TextStyle(
-                                                fontSize:
-                                                    16,
-                                                fontWeight:
-                                                    FontWeight.bold,
+                                              room["room_number"]?.toString() ?? "",
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
                                               ),
+                                              overflow: TextOverflow.ellipsis,
                                             ),
-
-                                            const SizedBox(
-                                                height:
-                                                    4),
-
+                                            const SizedBox(height: 4),
                                             Text(
                                               "${room["building_name"] ?? ""} • Floor ${room["floor_number"] ?? ""}",
-
-                                              style:
-                                                  const TextStyle(
-                                                color:
-                                                    Colors.grey,
+                                              style: const TextStyle(
+                                                color: Colors.grey,
                                               ),
+                                              overflow: TextOverflow.ellipsis,
                                             ),
-
                                             Text(
                                               "Flat : ${room["flat_number"] ?? "-"}",
-                                              style:
-                                                  const TextStyle(
-                                                color:
-                                                    Colors.grey,
+                                              style: const TextStyle(
+                                                color: Colors.grey,
                                               ),
+                                              overflow: TextOverflow.ellipsis,
                                             ),
-
                                             Text(
                                               "Type : ${room["room_type"] ?? "-"}",
+                                              overflow: TextOverflow.ellipsis,
                                             ),
-
                                             Text(
                                               "Capacity : ${room["capacity"]}",
+                                              overflow: TextOverflow.ellipsis,
                                             ),
-
                                             Text(
                                               "Rent : ₹${room["base_rent"]}",
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ],
                                         ),

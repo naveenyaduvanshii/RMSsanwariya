@@ -419,13 +419,14 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         value: selectedUnitType,
                         decoration: const InputDecoration(labelText: "Unit Type", border: OutlineInputBorder()),
                         items: const [
-                          DropdownMenuItem(value: "building", child: Text("Building")),
-                          DropdownMenuItem(value: "floor", child: Text("Floor")),
-                          DropdownMenuItem(value: "flat", child: Text("Flat")),
-                          DropdownMenuItem(value: "room", child: Text("Room")),
+                          DropdownMenuItem(value: "building", child: Text("Building", overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: "floor", child: Text("Floor", overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: "flat", child: Text("Flat", overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: "room", child: Text("Room", overflow: TextOverflow.ellipsis)),
                         ],
                         onChanged: (val) => setDialogState(() {
                           selectedUnitType = val!;
@@ -458,11 +459,12 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         value: selectedOccupancyType,
                         decoration: const InputDecoration(labelText: "Unit Policy", border: OutlineInputBorder()),
                          items: const [
-                           DropdownMenuItem(value: "shared", child: Text("Shared Policy")),
-                           DropdownMenuItem(value: "exclusive", child: Text("Exclusive Policy")),
+                           DropdownMenuItem(value: "shared", child: Text("Shared Policy", overflow: TextOverflow.ellipsis)),
+                           DropdownMenuItem(value: "exclusive", child: Text("Exclusive Policy", overflow: TextOverflow.ellipsis)),
                          ],
                         onChanged: (val) => setDialogState(() => selectedOccupancyType = val!),
                       ),
@@ -475,12 +477,13 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
                       
                       // Building Dropdown
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         value: tempBuildingId,
                         decoration: const InputDecoration(labelText: "Select Building", border: OutlineInputBorder()),
                         items: buildings.map<DropdownMenuItem<String>>((b) {
                           return DropdownMenuItem<String>(
                             value: b["id"],
-                            child: Text(b["name"] ?? ""),
+                            child: Text(b["name"] ?? "", overflow: TextOverflow.ellipsis),
                           );
                         }).toList(),
                         onChanged: (val) {
@@ -509,6 +512,7 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
                                 child: CircularProgressIndicator(),
                               )
                             : DropdownButtonFormField<String>(
+                                isExpanded: true,
                                 value: tempFloorId,
                                 decoration: const InputDecoration(labelText: "Select Floor", border: OutlineInputBorder()),
                                 items: currentFloors.map<DropdownMenuItem<String>>((f) {
@@ -517,7 +521,7 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
                                       : "Floor ${f["floor_number"]}";
                                   return DropdownMenuItem<String>(
                                     value: f["id"],
-                                    child: Text(dispName.toString()),
+                                    child: Text(dispName.toString(), overflow: TextOverflow.ellipsis),
                                   );
                                 }).toList(),
                                 onChanged: (val) {
@@ -537,6 +541,7 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
                       if ((selectedUnitType == "flat" || selectedUnitType == "room") && tempFloorId != null) ...[
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
+                          isExpanded: true,
                           value: tempFlatId,
                           decoration: InputDecoration(
                             labelText: selectedUnitType == "room" ? "Select Flat (Optional)" : "Select Flat",
@@ -546,12 +551,12 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
                             if (selectedUnitType == "room")
                               const DropdownMenuItem<String>(
                                 value: null,
-                                child: Text("None (Direct Room under Floor)"),
+                                child: Text("None (Direct Room under Floor)", overflow: TextOverflow.ellipsis),
                               ),
                             ...filteredFlats.map<DropdownMenuItem<String>>((f) {
                               return DropdownMenuItem<String>(
                                 value: f["id"],
-                                child: Text("Flat ${f["flat_number"]}"),
+                                child: Text("Flat ${f["flat_number"]}", overflow: TextOverflow.ellipsis),
                               );
                             }),
                           ],
@@ -570,12 +575,13 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
                       if (selectedUnitType == "room" && tempFloorId != null) ...[
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
+                          isExpanded: true,
                           value: tempRoomId,
                           decoration: const InputDecoration(labelText: "Select Room", border: OutlineInputBorder()),
                           items: filteredRooms.map<DropdownMenuItem<String>>((r) {
                             return DropdownMenuItem<String>(
                               value: r["id"],
-                              child: Text("Room ${r["room_number"]}"),
+                              child: Text("Room ${r["room_number"]}", overflow: TextOverflow.ellipsis),
                             );
                           }).toList(),
                           onChanged: (val) {
@@ -976,13 +982,14 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
               final isWide = constraints.maxWidth > 800;
 
               final buildingDropdown = SizedBox(
-                width: 160,
+                width: 170,
                 child: DropdownButtonFormField<String>(
+                  isExpanded: true,
                   value: selectedBuildingId,
                   decoration: const InputDecoration(labelText: "Building", border: OutlineInputBorder()),
                   items: [
-                    const DropdownMenuItem(value: null, child: Text("All Buildings")),
-                    ...buildingMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
+                    const DropdownMenuItem(value: null, child: Text("All Buildings", overflow: TextOverflow.ellipsis)),
+                    ...buildingMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis))),
                   ],
                   onChanged: (val) {
                     setState(() {
@@ -1003,19 +1010,20 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
               );
 
               final floorDropdown = SizedBox(
-                width: 160,
+                width: 150,
                 child: isFilterFloorsLoading
                     ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
                     : DropdownButtonFormField<String>(
+                        isExpanded: true,
                         value: selectedFloorId,
                         decoration: const InputDecoration(labelText: "Floor", border: OutlineInputBorder()),
                         items: [
-                          const DropdownMenuItem(value: null, child: Text("All Floors")),
+                          const DropdownMenuItem(value: null, child: Text("All Floors", overflow: TextOverflow.ellipsis)),
                           ...filterFloors.map((f) {
                             final dispName = f["floor_name"] != null && f["floor_name"].toString().isNotEmpty
                                 ? f["floor_name"]
                                 : "Floor ${f["floor_number"]}";
-                            return DropdownMenuItem(value: f["id"].toString(), child: Text(dispName.toString()));
+                            return DropdownMenuItem(value: f["id"].toString(), child: Text(dispName.toString(), overflow: TextOverflow.ellipsis));
                           }),
                         ],
                         onChanged: (val) => setState(() {
@@ -1027,13 +1035,14 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
               );
 
               final flatDropdown = SizedBox(
-                width: 160,
+                width: 150,
                 child: DropdownButtonFormField<String>(
+                  isExpanded: true,
                   value: selectedFlatId,
                   decoration: const InputDecoration(labelText: "Flat", border: OutlineInputBorder()),
                   items: [
-                    const DropdownMenuItem(value: null, child: Text("All Flats")),
-                    ...flatMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
+                    const DropdownMenuItem(value: null, child: Text("All Flats", overflow: TextOverflow.ellipsis)),
+                    ...flatMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis))),
                   ],
                   onChanged: (val) => setState(() {
                     selectedFlatId = val;
@@ -1043,57 +1052,61 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
               );
 
               final roomDropdown = SizedBox(
-                width: 160,
+                width: 150,
                 child: DropdownButtonFormField<String>(
+                  isExpanded: true,
                   value: selectedRoomId,
                   decoration: const InputDecoration(labelText: "Room", border: OutlineInputBorder()),
                   items: [
-                    const DropdownMenuItem(value: null, child: Text("All Rooms")),
-                    ...roomMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
+                    const DropdownMenuItem(value: null, child: Text("All Rooms", overflow: TextOverflow.ellipsis)),
+                    ...roomMap.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis))),
                   ],
                   onChanged: (val) => setState(() => selectedRoomId = val),
                 ),
               );
 
               final statusDropdown = SizedBox(
-                width: 160,
+                width: 170,
                 child: DropdownButtonFormField<String>(
+                  isExpanded: true,
                   value: selectedStatus,
                   decoration: const InputDecoration(labelText: "Occupancy Status", border: OutlineInputBorder()),
                   items: const [
-                    DropdownMenuItem(value: null, child: Text("All Status")),
-                    DropdownMenuItem(value: "vacant", child: Text("Vacant")),
-                    DropdownMenuItem(value: "partial", child: Text("Partial")),
-                    DropdownMenuItem(value: "occupied", child: Text("Occupied")),
+                    DropdownMenuItem(value: null, child: Text("All Status", overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: "vacant", child: Text("Vacant", overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: "partial", child: Text("Partial", overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: "occupied", child: Text("Occupied", overflow: TextOverflow.ellipsis)),
                   ],
                   onChanged: (val) => setState(() => selectedStatus = val),
                 ),
               );
 
               final policyDropdown = SizedBox(
-                width: 160,
+                width: 180,
                 child: DropdownButtonFormField<String>(
+                  isExpanded: true,
                   value: filterOccupancyPolicy,
                   decoration: const InputDecoration(labelText: "Occupancy Policy", border: OutlineInputBorder()),
                   items: const [
-                    DropdownMenuItem(value: null, child: Text("All Policies")),
-                    DropdownMenuItem(value: "shared", child: Text("Shared Policy")),
-                    DropdownMenuItem(value: "exclusive", child: Text("Exclusive Policy")),
-                    DropdownMenuItem(value: "exclusive_occupied", child: Text("Exclusively Occupied")),
+                    DropdownMenuItem(value: null, child: Text("All Policies", overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: "shared", child: Text("Shared Policy", overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: "exclusive", child: Text("Exclusive Policy", overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: "exclusive_occupied", child: Text("Exclusively Occupied", overflow: TextOverflow.ellipsis)),
                   ],
                   onChanged: (val) => setState(() => filterOccupancyPolicy = val),
                 ),
               );
 
               final sortDropdown = SizedBox(
-                width: 160,
+                width: 170,
                 child: DropdownButtonFormField<String>(
+                  isExpanded: true,
                   value: selectedSort,
                   decoration: const InputDecoration(labelText: "Sort By", border: OutlineInputBorder()),
                   items: const [
-                    DropdownMenuItem(value: "recently_changed", child: Text("Recently Changed")),
-                    DropdownMenuItem(value: "newest", child: Text("Newest Added")),
-                    DropdownMenuItem(value: "oldest", child: Text("Oldest Added")),
+                    DropdownMenuItem(value: "recently_changed", child: Text("Recently Changed", overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: "newest", child: Text("Newest Added", overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: "oldest", child: Text("Oldest Added", overflow: TextOverflow.ellipsis)),
                   ],
                   onChanged: (val) => setState(() => selectedSort = val!),
                 ),

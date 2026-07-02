@@ -110,7 +110,7 @@ class _ElectricityPageState extends State<ElectricityPage> {
             children: [
               Icon(Icons.download, color: Colors.blue),
               SizedBox(width: 10),
-              Text("Download PDF"),
+              Text("Download PDF", style: TextStyle(color: Color(0xFF1E293B))),
             ],
           ),
         ),
@@ -120,7 +120,7 @@ class _ElectricityPageState extends State<ElectricityPage> {
             children: [
               Icon(Icons.print, color: Colors.indigo),
               SizedBox(width: 10),
-              Text("Print"),
+              Text("Print", style: TextStyle(color: Color(0xFF1E293B))),
             ],
           ),
         ),
@@ -130,14 +130,14 @@ class _ElectricityPageState extends State<ElectricityPage> {
             children: [
               Icon(Icons.chat, color: Colors.green),
               SizedBox(width: 10),
-              Text("WhatsApp"),
+              Text("WhatsApp", style: TextStyle(color: Color(0xFF1E293B))),
             ],
           ),
         ),
       ],
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
-        child: Ink(
+        child: Container(
           width: isFullWidth ? double.infinity : null,
           decoration: BoxDecoration(
             color: Colors.blueAccent,

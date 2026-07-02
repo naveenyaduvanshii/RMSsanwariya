@@ -261,7 +261,7 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
             children: [
               Icon(Icons.download, color: Colors.blue),
               SizedBox(width: 10),
-              Text("Download PDF"),
+              Text("Download PDF", style: TextStyle(color: Color(0xFF1E293B))),
             ],
           ),
         ),
@@ -271,7 +271,7 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
             children: [
               Icon(Icons.print, color: Colors.indigo),
               SizedBox(width: 10),
-              Text("Print"),
+              Text("Print", style: TextStyle(color: Color(0xFF1E293B))),
             ],
           ),
         ),
@@ -281,14 +281,14 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
             children: [
               Icon(Icons.chat, color: Colors.green),
               SizedBox(width: 10),
-              Text("WhatsApp"),
+              Text("WhatsApp", style: TextStyle(color: Color(0xFF1E293B))),
             ],
           ),
         ),
       ],
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
-        child: Ink(
+        child: Container(
           width: isFullWidth ? double.infinity : null,
           decoration: BoxDecoration(
             color: const Color(0xFF0F172A),
@@ -646,7 +646,8 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
                       ],
                         const SizedBox(height: 15),
                       ],
-                      DropdownButtonFormField<String>(
+                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         value: filteredUnits.any((u) => u["id"].toString() == selectedRentalUnit) ? selectedRentalUnit : null,
                         decoration: const InputDecoration(labelText: "Rental Unit", border: OutlineInputBorder()),
                         items: filteredUnits.map((unit) {
@@ -671,6 +672,7 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
                             child: Text(
                               "$type: $details | ₹${unit["rent"]} ($occType: $occ/$cap)",
                               style: const TextStyle(fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           );
                         }).toList(),
@@ -1135,11 +1137,12 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
     final rooms = getUniqueRooms();
 
     final buildingFilterWidget = DropdownButtonFormField<String>(
+      isExpanded: true,
       value: filterBuilding,
       decoration: const InputDecoration(labelText: "Building", border: OutlineInputBorder()),
       items: [
-        const DropdownMenuItem<String>(value: null, child: Text("All Buildings")),
-        ...buildings.map((b) => DropdownMenuItem(value: b, child: Text(b))),
+        const DropdownMenuItem<String>(value: null, child: Text("All Buildings", overflow: TextOverflow.ellipsis)),
+        ...buildings.map((b) => DropdownMenuItem(value: b, child: Text(b, overflow: TextOverflow.ellipsis))),
       ],
       onChanged: (val) {
         setState(() {
@@ -1152,11 +1155,12 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
     );
 
     final floorFilterWidget = DropdownButtonFormField<String>(
+      isExpanded: true,
       value: filterFloor,
       decoration: const InputDecoration(labelText: "Floor", border: OutlineInputBorder()),
       items: [
-        const DropdownMenuItem<String>(value: null, child: Text("All Floors")),
-        ...floors.map((f) => DropdownMenuItem(value: f, child: Text(f))),
+        const DropdownMenuItem<String>(value: null, child: Text("All Floors", overflow: TextOverflow.ellipsis)),
+        ...floors.map((f) => DropdownMenuItem(value: f, child: Text(f, overflow: TextOverflow.ellipsis))),
       ],
       onChanged: (val) {
         setState(() {
@@ -1168,11 +1172,12 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
     );
 
     final roomFilterWidget = DropdownButtonFormField<String>(
+      isExpanded: true,
       value: filterRoom,
       decoration: const InputDecoration(labelText: "Room", border: OutlineInputBorder()),
       items: [
-        const DropdownMenuItem<String>(value: null, child: Text("All Rooms")),
-        ...rooms.map((r) => DropdownMenuItem(value: r, child: Text(r))),
+        const DropdownMenuItem<String>(value: null, child: Text("All Rooms", overflow: TextOverflow.ellipsis)),
+        ...rooms.map((r) => DropdownMenuItem(value: r, child: Text(r, overflow: TextOverflow.ellipsis))),
       ],
       onChanged: (val) {
         setState(() => filterRoom = val);
@@ -1181,13 +1186,14 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
     );
 
     final statusFilterWidget = DropdownButtonFormField<String>(
+      isExpanded: true,
       value: filterStatus,
       decoration: const InputDecoration(labelText: "Status", border: OutlineInputBorder()),
       items: const [
-        DropdownMenuItem(value: null, child: Text("All Statuses")),
-        DropdownMenuItem(value: "active", child: Text("Active")),
-        DropdownMenuItem(value: "pending", child: Text("Pending")),
-        DropdownMenuItem(value: "vacated", child: Text("Vacated")),
+        DropdownMenuItem(value: null, child: Text("All Statuses", overflow: TextOverflow.ellipsis)),
+        DropdownMenuItem(value: "active", child: Text("Active", overflow: TextOverflow.ellipsis)),
+        DropdownMenuItem(value: "pending", child: Text("Pending", overflow: TextOverflow.ellipsis)),
+        DropdownMenuItem(value: "vacated", child: Text("Vacated", overflow: TextOverflow.ellipsis)),
       ],
       onChanged: (val) {
         setState(() => filterStatus = val);
@@ -1196,11 +1202,12 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
     );
 
     final sortFilterWidget = DropdownButtonFormField<String>(
+      isExpanded: true,
       value: filterSort,
       decoration: const InputDecoration(labelText: "Sorting", border: OutlineInputBorder()),
       items: const [
-        DropdownMenuItem(value: "newest", child: Text("Newest first")),
-        DropdownMenuItem(value: "oldest", child: Text("Oldest first")),
+        DropdownMenuItem(value: "newest", child: Text("Newest first", overflow: TextOverflow.ellipsis)),
+        DropdownMenuItem(value: "oldest", child: Text("Oldest first", overflow: TextOverflow.ellipsis)),
       ],
       onChanged: (val) {
         setState(() => filterSort = val);
