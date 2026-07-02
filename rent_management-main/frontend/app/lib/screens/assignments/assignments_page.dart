@@ -1033,21 +1033,27 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
                 "${assignments.length} assignments registered",
                 style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
               ),
-              if (widget.role == "owner" || widget.role == "manager") ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () => showAssignmentDialog(),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text("Assign Tenant"),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              const SizedBox(height: 12),
+              Column(
+                children: [
+                  _buildReportOptionsButton(context, isFullWidth: true),
+                  if (widget.role == "owner" || widget.role == "manager") ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => showAssignmentDialog(),
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text("Assign Tenant"),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ],
+                  ],
+                ],
+              ),
             ],
           );
         } else {
@@ -1068,16 +1074,23 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
                   ),
                 ],
               ),
-              if (widget.role == "owner" || widget.role == "manager")
-                ElevatedButton.icon(
-                  onPressed: () => showAssignmentDialog(),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text("Assign Tenant"),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
+              Row(
+                children: [
+                  _buildReportOptionsButton(context, isFullWidth: false),
+                  if (widget.role == "owner" || widget.role == "manager") ...[
+                    const SizedBox(width: 10),
+                    ElevatedButton.icon(
+                      onPressed: () => showAssignmentDialog(),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text("Assign Tenant"),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           );
         }
@@ -1237,37 +1250,13 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
       ],
     );
 
-    final actionButtonsWidget = LayoutBuilder(
-      builder: (context, constraints) {
-        final isMobile = MediaQuery.of(context).size.width < 600;
-        if (isMobile) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextButton.icon(
-                onPressed: resetFilters,
-                icon: const Icon(Icons.refresh),
-                label: const Text("Reset Filters"),
-              ),
-              const SizedBox(height: 8),
-              _buildReportOptionsButton(context, isFullWidth: true),
-            ],
-          );
-        } else {
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton.icon(
-                onPressed: resetFilters,
-                icon: const Icon(Icons.refresh),
-                label: const Text("Reset Filters"),
-              ),
-              const SizedBox(width: 10),
-              _buildReportOptionsButton(context, isFullWidth: false),
-            ],
-          );
-        }
-      }
+    final actionButtonsWidget = Align(
+      alignment: Alignment.centerRight,
+      child: TextButton.icon(
+        onPressed: resetFilters,
+        icon: const Icon(Icons.refresh),
+        label: const Text("Reset Filters"),
+      ),
     );
 
     return Container(
