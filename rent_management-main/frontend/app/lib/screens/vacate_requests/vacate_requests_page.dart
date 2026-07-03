@@ -29,22 +29,55 @@ class _VacatePipelinePageState
   List notices = [];
   bool loading = true;
 
+  final TextEditingController reasonController = TextEditingController();
+  DateTime? selectedVacateDate;
+  String? activeAssignmentId;
+
+  Future<void> fetchActiveAssignment() async {
+    if (widget.role != "tenant") return;
+    try {
+      final response = await http.get(Uri.parse("$baseUrl/api/tenant-assignments/"));
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final list = body["data"] ?? [];
+        for (var item in list) {
+          if (item["tenant_id"].toString() == widget.renterId && item["status"] == "active") {
+            setState(() {
+              activeAssignmentId = item["id"].toString();
+            });
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching active assignment: $e");
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    fetchActiveAssignment();
     fetchNotices();
   }
 
   Future<void> fetchNotices() async {
-    final res = await http.get(
-      Uri.parse("$baseUrl/api/vacate-notices/"),
-    );
+    setState(() => loading = true);
+    try {
+      final res = await http.get(
+        Uri.parse("$baseUrl/api/vacate/list/"),
+      );
 
-    if (res.statusCode == 200) {
-      setState(() {
-        notices = jsonDecode(res.body);
-        loading = false;
-      });
+      if (res.statusCode == 200) {
+        setState(() {
+          notices = jsonDecode(res.body);
+          loading = false;
+        });
+      } else {
+        setState(() => loading = false);
+      }
+    } catch (e) {
+      setState(() => loading = false);
     }
   }
 
@@ -54,23 +87,145 @@ class _VacatePipelinePageState
 
   Future<void> approve(String id) async {
     await http.post(
-      Uri.parse("$baseUrl/api/vacate-approve/$id/"),
+      Uri.parse("$baseUrl/api/vacate/$id/approve/"),
     );
     fetchNotices();
   }
 
   Future<void> reject(String id) async {
     await http.post(
-      Uri.parse("$baseUrl/api/vacate-reject/$id/"),
+      Uri.parse("$baseUrl/api/vacate/$id/reject/"),
     );
     fetchNotices();
   }
 
   Future<void> complete(String id) async {
     await http.post(
-      Uri.parse("$baseUrl/api/vacate-complete/$id/"),
+      Uri.parse("$baseUrl/api/vacate/$id/complete/"),
     );
     fetchNotices();
+  }
+
+  void openCreateNoticeDialog() {
+    if (activeAssignmentId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No active assignment found. Cannot submit vacate request.")),
+      );
+      return;
+    }
+
+    reasonController.clear();
+    selectedVacateDate = null;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Text("Request Vacate Notice"),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: reasonController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: "Reason for Vacating",
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            selectedVacateDate == null
+                                ? "Choose Vacate Date"
+                                : "Vacate Date: ${selectedVacateDate!.year}-${selectedVacateDate!.month.toString().padLeft(2, '0')}-${selectedVacateDate!.day.toString().padLeft(2, '0')}",
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.calendar_today, color: Colors.deepPurple),
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: DateTime.now().add(const Duration(days: 30)),
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime.now().add(const Duration(days: 365)),
+                            );
+                            if (picked != null) {
+                              setDialogState(() {
+                                selectedVacateDate = picked;
+                              });
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Cancel"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (selectedVacateDate == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Please select a vacate date")),
+                      );
+                      return;
+                    }
+                    Navigator.pop(context);
+                    await submitVacateNotice();
+                  },
+                  child: const Text("Submit"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> submitVacateNotice() async {
+    setState(() => loading = true);
+    try {
+      final String todayStr = "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}";
+      final String vacateStr = "${selectedVacateDate!.year}-${selectedVacateDate!.month.toString().padLeft(2, '0')}-${selectedVacateDate!.day.toString().padLeft(2, '0')}";
+      
+      final response = await http.post(
+        Uri.parse("$baseUrl/api/vacate/create/"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "tenant": widget.renterId,
+          "assignment": activeAssignmentId,
+          "notice_date": todayStr,
+          "vacate_date": vacateStr,
+          "reason": reasonController.text,
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        fetchNotices();
+      } else {
+        final err = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${err['error'] ?? 'Failed to submit'}")),
+        );
+        setState(() => loading = false);
+      }
+    } catch (e) {
+      debugPrint("Error submitting notice: $e");
+      setState(() => loading = false);
+    }
   }
 
   ////////////////////////////////////////////////////////////
@@ -86,15 +241,41 @@ class _VacatePipelinePageState
       currentIndex: 15,
       child: loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: notices.length,
-              itemBuilder: (context, index) {
-
-                final n = notices[index];
-
-                return _pipelineCard(n);
-              },
+          : Column(
+              children: [
+                if (widget.role == "tenant") ...[
+                  Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: openCreateNoticeDialog,
+                        icon: const Icon(Icons.logout),
+                        label: const Text("Request Vacate / Notice"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepPurple,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: notices.length,
+                    itemBuilder: (context, index) {
+                      final n = notices[index];
+                      if (widget.role == "tenant" && n["tenant"].toString() != widget.renterId) {
+                        return const SizedBox.shrink();
+                      }
+                      return _pipelineCard(n);
+                    },
+                  ),
+                ),
+              ],
             ),
     );
   }
@@ -141,7 +322,7 @@ class _VacatePipelinePageState
             children: [
               Expanded(
                 child: Text(
-                  "Tenant: ${n['tenant']}",
+                  "Tenant: ${n['tenant_name'] ?? n['tenant']}",
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,

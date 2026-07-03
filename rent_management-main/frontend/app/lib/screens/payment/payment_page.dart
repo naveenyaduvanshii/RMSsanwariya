@@ -95,6 +95,10 @@ class _PaymentsPageState extends State<PaymentsPage> {
 
   List getPaidBills() {
     return bills.where((b) {
+      if (widget.role == "tenant" && b["tenant_id"]?.toString() != widget.renterId) {
+        return false;
+      }
+
       // 1. Must be PAID
       if (b["status"] != "paid") return false;
 
@@ -146,28 +150,30 @@ class _PaymentsPageState extends State<PaymentsPage> {
                   const SizedBox(height: 15),
 
                   // TOTAL LEDGER CARD
-                  Card(
-                    color: Colors.blue.shade50,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(18.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text("TOTAL RECORDED COLLECTION", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue.shade800)),
-                              const SizedBox(height: 6),
-                              Text("₹${totalCollection.toStringAsFixed(1)}", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue.shade900)),
-                            ],
-                          ),
-                          const Icon(Icons.account_balance_wallet, size: 40, color: Colors.blue),
-                        ],
+                  if (widget.role != "tenant") ...[
+                    Card(
+                      color: Colors.blue.shade50,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(18.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("TOTAL RECORDED COLLECTION", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue.shade800)),
+                                const SizedBox(height: 6),
+                                Text("₹${totalCollection.toStringAsFixed(1)}", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue.shade900)),
+                              ],
+                            ),
+                            const Icon(Icons.account_balance_wallet, size: 40, color: Colors.blue),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 15),
+                    const SizedBox(height: 15),
+                  ],
 
                   // SEARCH & FILTERS CONTAINER
                   Container(

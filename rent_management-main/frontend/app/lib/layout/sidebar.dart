@@ -345,11 +345,6 @@ class Sidebar extends StatelessWidget {
     },
 
     {
-      "title": "My Property",
-      "icon": Icons.home,
-    },
-
-    {
       "title": "My Assignment",
       "icon": Icons.assignment,
     },

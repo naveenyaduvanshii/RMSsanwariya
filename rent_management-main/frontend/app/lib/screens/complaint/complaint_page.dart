@@ -55,11 +55,35 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
   /// INIT
   ////////////////////////////////////////////////////////////
 
+  String? activeAssignmentId;
+
+  Future<void> fetchActiveAssignment() async {
+    if (widget.role != "tenant") return;
+    try {
+      final response = await http.get(Uri.parse("$baseUrl/api/tenant-assignments/"));
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final list = body["data"] ?? [];
+        for (var item in list) {
+          if (item["tenant_id"].toString() == widget.renterId && item["status"] == "active") {
+            setState(() {
+              activeAssignmentId = item["id"].toString();
+            });
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching active assignment: $e");
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     fetchComplaints();
     fetchUsers();
+    fetchActiveAssignment();
   }
 
   ////////////////////////////////////////////////////////////
@@ -68,8 +92,11 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
 
   Future<void> fetchComplaints() async {
     try {
+      final url = widget.role == "tenant"
+          ? "$baseUrl/api/complaints/?tenant_id=${widget.renterId}"
+          : "$baseUrl/api/complaints/";
       final res = await http.get(
-        Uri.parse("$baseUrl/api/complaints/"),
+        Uri.parse(url),
       );
 
       if (res.statusCode == 200) {
@@ -90,7 +117,7 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
   Future<void> fetchUsers() async {
     try {
       final res = await http.get(
-        Uri.parse("$baseUrl/api/users/"),
+        Uri.parse("$baseUrl/api/managers/"),
       );
 
       if (res.statusCode == 200) {
@@ -107,16 +134,22 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
 
   Future<void> createComplaint() async {
     if (titleController.text.isEmpty) return;
+    if (widget.role == "tenant" && activeAssignmentId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No active residence assignment found. Cannot file complaint.")),
+      );
+      return;
+    }
 
     setState(() => isSaving = true);
 
     try {
       final res = await http.post(
-        Uri.parse("$baseUrl/api/create-complaint/"),
+        Uri.parse("$baseUrl/api/complaints/create/"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "tenant_id": widget.renterId,
-          "assignment_id": null,
+          "assignment_id": activeAssignmentId,
           "title": titleController.text,
           "description": descController.text,
           "priority": selectedPriority,
@@ -143,7 +176,7 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
 
     try {
       final res = await http.put(
-        Uri.parse("$baseUrl/api/update-complaint/$editId/"),
+        Uri.parse("$baseUrl/api/complaints/$editId/update/"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "title": titleController.text,
@@ -171,7 +204,7 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
   Future<void> deleteComplaint(String id) async {
     try {
       await http.delete(
-        Uri.parse("$baseUrl/api/delete-complaint/$id/"),
+        Uri.parse("$baseUrl/api/complaints/$id/delete/"),
       );
 
       fetchComplaints();

@@ -372,6 +372,10 @@ class _BillsPageState extends State<BillsPage> {
   List getFilteredBills() {
     final now = DateTime.now();
     final res = bills.where((b) {
+      if (widget.role == "tenant" && b["tenant_id"]?.toString() != widget.renterId) {
+        return false;
+      }
+
       // 1. Search Query (tenant name & mobile no)
       final name = b["tenant_name"].toString().toLowerCase();
       final phone = b["tenant_phone"].toString().toLowerCase();
@@ -639,8 +643,9 @@ class _BillsPageState extends State<BillsPage> {
                   const SizedBox(height: 15),
 
                   // SUMMARY METRICS CARDS
-                  LayoutBuilder(
-                    builder: (context, constraints) {
+                  if (widget.role != "tenant") ...[
+                    LayoutBuilder(
+                      builder: (context, constraints) {
                       final isMobile = constraints.maxWidth < 600;
                       final collectedCard = Card(
                         color: Colors.green.shade50,
@@ -694,6 +699,7 @@ class _BillsPageState extends State<BillsPage> {
                     }
                   ),
                   const SizedBox(height: 15),
+                  ],
 
                   // FILTERS ACCORDION / BOX
                   Container(

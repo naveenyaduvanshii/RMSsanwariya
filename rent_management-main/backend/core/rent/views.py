@@ -273,6 +273,11 @@ def dashboard(request):
                 "complaints": complaints_count,
                 "recent_payments": payments_data,
                 "recent_complaints": complaints_data,
+                "building_name": assignment.rental_unit.building.name if assignment and assignment.rental_unit and assignment.rental_unit.building else "",
+                "floor_number": assignment.rental_unit.floor.floor_number if assignment and assignment.rental_unit and assignment.rental_unit.floor else "",
+                "flat_number": assignment.rental_unit.flat.flat_number if assignment and assignment.rental_unit and assignment.rental_unit.flat else "",
+                "room_number": assignment.rental_unit.room.room_number if assignment and assignment.rental_unit and assignment.rental_unit.room else "",
+                "rent_start_date": assignment.rent_start_date.strftime("%d-%m-%Y") if assignment and assignment.rent_start_date else "",
             }
         })
 
@@ -1124,6 +1129,7 @@ def tenant_assignments_list(request):
                 "tenant_phone": item.tenant.phone,
 
                 "rental_unit_id": str(rental_unit.id),
+                "room_id": str(rental_unit.room.id) if (rental_unit and rental_unit.room) else "",
 
                 "unit_type": rental_unit.unit_type,
 
@@ -3034,6 +3040,7 @@ def bills_list(request):
             data.append({
                 "id": str(bill.id),
                 "assignment_id": str(bill.assignment.id) if bill.assignment else None,
+                "tenant_id": str(bill.assignment.tenant.id) if (bill.assignment and bill.assignment.tenant) else None,
                 "tenant_name": bill.assignment.tenant.name if (bill.assignment and bill.assignment.tenant) else "Unknown Tenant",
                 "tenant_phone": bill.assignment.tenant.phone if (bill.assignment and bill.assignment.tenant) else "",
                 "building_id": building_id,
@@ -3520,6 +3527,11 @@ def payment_transactions_list(request):
                 "payment_id":
                     str(item.payment.id),
 
+                "tenant_id":
+                    str(item.payment.bill.assignment.tenant.id)
+                    if (item.payment and item.payment.bill and item.payment.bill.assignment and item.payment.bill.assignment.tenant)
+                    else "",
+
                 "tenant_name":
 
                     item.payment.bill
@@ -3768,6 +3780,44 @@ def create_payment_transaction(request):
         "success": False
 
     })
+########################################################
+# COMPLAINTS LIST
+########################################################
+@csrf_exempt
+def complaints_list(request):
+    if request.method == "GET":
+        tenant_id = request.GET.get("tenant_id")
+        if tenant_id:
+            complaints = Complaint.objects.filter(tenant_id=tenant_id).select_related("tenant", "assignment", "assigned_to").order_by("-created_at")
+        else:
+            complaints = Complaint.objects.select_related("tenant", "assignment", "assigned_to").order_by("-created_at")
+
+        data = []
+        for item in complaints:
+            data.append({
+                "id": str(item.id),
+                "tenant_id": str(item.tenant.id) if item.tenant else "",
+                "tenant_name": item.tenant.name if item.tenant else "",
+                "assignment_id": str(item.assignment.id) if item.assignment else "",
+                "title": item.title,
+                "description": item.description,
+                "priority": item.priority,
+                "status": item.status,
+                "assigned_to_id": str(item.assigned_to.id) if item.assigned_to else "",
+                "assigned_to_name": item.assigned_to.name if item.assigned_to else "",
+                "created_at": item.created_at.strftime("%d-%m-%Y %H:%M") if item.created_at else "",
+            })
+
+        return JsonResponse({
+            "success": True,
+            "data": data
+        })
+
+    return JsonResponse({
+        "success": False
+    })
+
+
 ########################################################
 # CREATE COMPLAINT
 ########################################################
@@ -4741,6 +4791,7 @@ def list_vacate_notices(request):
         data.append({
             "id": str(n.id),
             "tenant": str(n.tenant_id),
+            "tenant_name": n.tenant.name if n.tenant else "",
             "assignment": str(n.assignment_id),
             "notice_date": n.notice_date,
             "vacate_date": n.vacate_date,

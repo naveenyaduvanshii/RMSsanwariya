@@ -125,6 +125,10 @@ class _DashboardPageState extends State<DashboardPage> {
                         children: [
                           _buildHeader(),
                           const SizedBox(height: 24),
+                          if (widget.role == "tenant") ...[
+                            _buildTenantPropertyCard(),
+                            const SizedBox(height: 24),
+                          ],
                           _buildQuickActions(),
                           const SizedBox(height: 28),
                           const Text(
@@ -223,6 +227,111 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildTenantPropertyCard() {
+    final building = dashboardData?["building_name"] ?? "";
+    final floor = dashboardData?["floor_number"] ?? "";
+    final flat = dashboardData?["flat_number"] ?? "";
+    final room = dashboardData?["room_number"] ?? "";
+    final startDate = dashboardData?["rent_start_date"] ?? "";
+
+    if (building.isEmpty && room.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.home_work, color: Colors.blueAccent, size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Your Assigned Residence",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (startDate.isNotEmpty)
+                      Text(
+                        "Lease Started: $startDate",
+                        style: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 11,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: Colors.white24, height: 1),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 24,
+            runSpacing: 12,
+            children: [
+              if (building.isNotEmpty) _buildPropertyDetailItem("Building", building),
+              if (floor.toString().isNotEmpty) _buildPropertyDetailItem("Floor", "Floor $floor"),
+              if (flat.isNotEmpty) _buildPropertyDetailItem("Flat", "Flat $flat"),
+              if (room.isNotEmpty) _buildPropertyDetailItem("Room", "Room $room"),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPropertyDetailItem(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            color: Colors.grey,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 

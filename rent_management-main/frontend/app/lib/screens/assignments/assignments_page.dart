@@ -163,6 +163,10 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
     final maxRent = double.tryParse(maxRentController.text) ?? double.infinity;
 
     filteredAssignments = assignments.where((item) {
+      if (widget.role == "tenant" && item["tenant_id"]?.toString() != widget.renterId) {
+        return false;
+      }
+
       final tenantName = (item["tenant_name"] ?? "").toString().toLowerCase();
       final phone = (item["tenant_phone"] ?? "").toString().toLowerCase();
       final room = (item["room_number"] ?? "").toString().toLowerCase();

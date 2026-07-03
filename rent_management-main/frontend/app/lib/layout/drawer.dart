@@ -184,7 +184,6 @@ class AppDrawer extends StatelessWidget {
 
     return [
       {"title": "Dashboard", "icon": Icons.dashboard},
-      {"title": "My Property", "icon": Icons.home},
       {"title": "My Assignment", "icon": Icons.assignment},
       {"title": "Bills", "icon": Icons.receipt_long},
       {"title": "Payments", "icon": Icons.payments},

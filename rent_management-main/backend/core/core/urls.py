@@ -74,6 +74,7 @@ urlpatterns = [
     path("api/payments/<uuid:payment_id>/delete/", views.delete_payment),
     path("api/payments/transactions/", views.payment_transactions_list),
     path("api/payments/transactions/create/", views.create_payment_transaction),
+    path("api/complaints/", views.complaints_list),
     path("api/complaints/create/", views.create_complaint),
     path("api/complaints/<uuid:complaint_id>/update/", views.update_complaint),
     path("api/complaints/<uuid:complaint_id>/delete/", views.delete_complaint),

@@ -47,15 +47,44 @@ class _ElectricityPageState extends State<ElectricityPage> {
   final TextEditingController rateController = TextEditingController();
   final TextEditingController monthController = TextEditingController();
 
+  String? activeRoomId;
+
+  Future<void> fetchActiveAssignment() async {
+    if (widget.role != "tenant") return;
+    try {
+      final response = await http.get(Uri.parse("$baseUrl/api/tenant-assignments/"));
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final list = body["data"] ?? [];
+        for (var item in list) {
+          if (item["tenant_id"].toString() == widget.renterId && item["status"] == "active") {
+            setState(() {
+              activeRoomId = item["room_id"]?.toString();
+            });
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching active assignment: $e");
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    fetchReadings();
+    fetchActiveAssignment().then((_) {
+      fetchReadings();
+    });
     fetchRooms();
   }
 
   List getFilteredReadings() {
     return readings.where((r) {
+      if (widget.role == "tenant" && r["room_id"]?.toString() != activeRoomId) {
+        return false;
+      }
+
       if (filterBuilding != null && r["building_name"] != filterBuilding) {
         return false;
       }

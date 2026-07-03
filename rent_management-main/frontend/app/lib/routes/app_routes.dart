@@ -249,6 +249,17 @@ class AppRoutes {
       ),
     ),
 
+    '/my-assignment': (context) =>
+        page(
+      context,
+      (role, userName, renterId) =>
+          TenantAssignmentsPage(
+        role: role,
+        userName: userName,
+        renterId: renterId,
+      ),
+    ),
+
     //////////////////////////////////////////////////////
     // BILLS
     //////////////////////////////////////////////////////
@@ -344,6 +355,17 @@ class AppRoutes {
     //////////////////////////////////////////////////////
 
     '/vacate-requests': (context) =>
+        page(
+      context,
+      (role, userName, renterId) =>
+          VacatePipelinePage(
+        role: role,
+        userName: userName,
+        renterId: renterId,
+      ),
+    ),
+
+    '/vacate-request': (context) =>
         page(
       context,
       (role, userName, renterId) =>

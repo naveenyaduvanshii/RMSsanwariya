@@ -129,7 +129,6 @@ class _MainLayoutState extends State<MainLayout> {
     return [
 
       '/dashboard',
-      '/my-property',
       '/my-assignment',
       '/bills',
       '/payments',
@@ -197,7 +196,6 @@ class _MainLayoutState extends State<MainLayout> {
     return [
 
       "Dashboard",
-      "My Property",
       "My Assignment",
       "Bills",
       "Payments",
@@ -212,6 +210,11 @@ class _MainLayoutState extends State<MainLayout> {
 
   @override
   Widget build(BuildContext context) {
+    final currentRouteName = ModalRoute.of(context)?.settings.name;
+    final routes = getRoutesByRole(widget.role);
+    final activeIndex = (currentRouteName != null && routes.contains(currentRouteName))
+        ? routes.indexOf(currentRouteName)
+        : widget.currentIndex;
 
     final isMobile =
         MediaQuery.of(context).size.width < 800;
@@ -224,8 +227,7 @@ class _MainLayoutState extends State<MainLayout> {
       drawer: isMobile
           ? AppDrawer(
               role: widget.role,
-              selectedIndex:
-                  widget.currentIndex,
+              selectedIndex: activeIndex,
               onTap: onMenuTap,
             )
           : null,
@@ -251,8 +253,7 @@ class _MainLayoutState extends State<MainLayout> {
                   if (!isMobile)
                     Sidebar(
                       role: widget.role,
-                      selectedIndex:
-                          widget.currentIndex,
+                      selectedIndex: activeIndex,
                       onTap: onMenuTap,
                     ),
 
