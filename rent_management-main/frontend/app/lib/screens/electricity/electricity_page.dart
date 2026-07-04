@@ -48,6 +48,7 @@ class _ElectricityPageState extends State<ElectricityPage> {
   final TextEditingController monthController = TextEditingController();
 
   String? activeRoomId;
+  DateTime? activeRentStartDate;
 
   Future<void> fetchActiveAssignment() async {
     if (widget.role != "tenant") return;
@@ -60,6 +61,9 @@ class _ElectricityPageState extends State<ElectricityPage> {
           if (item["tenant_id"].toString() == widget.renterId && item["status"] == "active") {
             setState(() {
               activeRoomId = item["room_id"]?.toString();
+              if (item["rent_start_date"] != null) {
+                activeRentStartDate = DateTime.parse(item["rent_start_date"].toString());
+              }
             });
             break;
           }
@@ -81,8 +85,19 @@ class _ElectricityPageState extends State<ElectricityPage> {
 
   List getFilteredReadings() {
     return readings.where((r) {
-      if (widget.role == "tenant" && r["room_id"]?.toString() != activeRoomId) {
-        return false;
+      if (widget.role == "tenant") {
+        if (r["room_id"]?.toString() != activeRoomId) {
+          return false;
+        }
+        if (activeRentStartDate != null && r["reading_month"] != null) {
+          try {
+            final readingDate = DateTime.parse(r["reading_month"].toString());
+            if (readingDate.year < activeRentStartDate!.year ||
+                (readingDate.year == activeRentStartDate!.year && readingDate.month < activeRentStartDate!.month)) {
+              return false;
+            }
+          } catch (_) {}
+        }
       }
 
       if (filterBuilding != null && r["building_name"] != filterBuilding) {
@@ -775,7 +790,7 @@ class _ElectricityPageState extends State<ElectricityPage> {
                     ),
                   ),
                   const SizedBox(height: 15),
-                  ]
+                  ],
 
                   // SCROLLABLE LEDGER DATA OVERVIEW
                   filteredReadings.isEmpty

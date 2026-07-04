@@ -925,7 +925,7 @@ class _BillsPageState extends State<BillsPage> {
                     ),
                   ),
                   const SizedBox(height: 15),
-                  ]
+                  ],
 
                   // BILL LIST
                   filteredList.isEmpty

@@ -2378,6 +2378,15 @@ def electricity_report_view(request):
         room_id = request.GET.get("room_id", "").strip()
         if room_id:
             readings = readings.filter(room_id=room_id)
+            # Find active assignment to restrict readings starting from the assignment start month
+            try:
+                import datetime
+                assignment = TenantAssignment.objects.filter(rental_unit__room_id=room_id, status="active").first()
+                if assignment and assignment.rent_start_date:
+                    start_of_month = datetime.date(assignment.rent_start_date.year, assignment.rent_start_date.month, 1)
+                    readings = readings.filter(reading_month__gte=start_of_month)
+            except Exception as e:
+                pass
 
         total_units = 0.0
         total_amount = 0.0
@@ -5061,6 +5070,11 @@ def assignments_report_view(request):
                 Q(rental_unit__room__room_number__icontains=search) |
                 Q(rental_unit__flat__flat_number__icontains=search)
             )
+
+        # Tenant Filter
+        tenant_id = request.GET.get("tenant_id", "").strip()
+        if tenant_id:
+            assignments = assignments.filter(tenant_id=tenant_id)
 
         # 2. Building Filter
         building = request.GET.get("building", "").strip()

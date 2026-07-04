@@ -57,21 +57,20 @@ class _MainLayoutState extends State<MainLayout> {
     },
   );
 }
-  //////////////////////////////////////////////////////
-  // PAGE TITLE
-  //////////////////////////////////////////////////////
-
   String getCurrentPageTitle() {
+    final currentRouteName = ModalRoute.of(context)?.settings.name;
+    final routes = getRoutesByRole(widget.role);
+    final activeIndex = (currentRouteName != null && routes.contains(currentRouteName))
+        ? routes.indexOf(currentRouteName)
+        : widget.currentIndex;
 
-    final titles =
-        getTitlesByRole(widget.role);
+    final titles = getTitlesByRole(widget.role);
 
-    if (widget.currentIndex >=
-        titles.length) {
+    if (activeIndex >= titles.length) {
       return "";
     }
 
-    return titles[widget.currentIndex];
+    return titles[activeIndex];
   }
 
   //////////////////////////////////////////////////////

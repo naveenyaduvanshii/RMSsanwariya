@@ -227,6 +227,7 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
     final rentMax = maxRentController.text.trim();
     final status = filterStatus ?? "all";
     final sort = filterSort ?? "newest";
+    final tenantParam = widget.role == "tenant" ? "&tenant_id=${widget.renterId}" : "";
 
     final url = "${ApiService.baseUrl}/api/assignments/report/pdf/?"
         "search=${Uri.encodeComponent(search)}"
@@ -236,7 +237,8 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
         "&rent_min=${Uri.encodeComponent(rentMin)}"
         "&rent_max=${Uri.encodeComponent(rentMax)}"
         "&status=${Uri.encodeComponent(status)}"
-        "&sort=${Uri.encodeComponent(sort)}";
+        "&sort=${Uri.encodeComponent(sort)}"
+        "$tenantParam";
 
     launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
@@ -980,7 +982,7 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
       role: widget.role,
       userName: widget.userName,
       renterId: widget.renterId,
-      currentIndex: 8,
+      currentIndex: widget.role == "tenant" ? 1 : 8,
       child: isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
