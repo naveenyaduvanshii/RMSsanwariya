@@ -34,6 +34,8 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
 
   final TextEditingController titleController = TextEditingController();
   final TextEditingController descController = TextEditingController();
+  final TextEditingController searchController = TextEditingController();
+  String searchQuery = "";
 
   ////////////////////////////////////////////////////////////
   /// DATA
@@ -333,12 +335,24 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
     }
   }
 
+  List getFilteredComplaints() {
+    if (searchQuery.isEmpty) return complaints;
+    final q = searchQuery.toLowerCase();
+    return complaints.where((c) {
+      final name = (c["tenant_name"] ?? "").toString().toLowerCase();
+      final phone = (c["tenant_phone"] ?? "").toString().toLowerCase();
+      return name.contains(q) || phone.contains(q);
+    }).toList();
+  }
+
   ////////////////////////////////////////////////////////////
   /// UI
   ////////////////////////////////////////////////////////////
 
   @override
   Widget build(BuildContext context) {
+    final filtered = getFilteredComplaints();
+
     return MainLayout(
       role: widget.role,
       userName: widget.userName,
@@ -404,67 +418,117 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
                 ),
 
                 //////////////////////////////////////////////////////
+                /// SEARCH BAR (Owner / Manager Only)
+                //////////////////////////////////////////////////////
+
+                if (widget.role != "tenant") ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: TextField(
+                      controller: searchController,
+                      decoration: InputDecoration(
+                        labelText: "Search by tenant name or mobile...",
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        suffixIcon: searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  setState(() {
+                                    searchController.clear();
+                                    searchQuery = "";
+                                  });
+                                },
+                              )
+                            : null,
+                      ),
+                      onChanged: (val) {
+                        setState(() {
+                          searchQuery = val;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+
+                //////////////////////////////////////////////////////
                 /// LIST
                 //////////////////////////////////////////////////////
 
                 Expanded(
-                  child: ListView.builder(
-                    itemCount: complaints.length,
-                    itemBuilder: (context, index) {
-                      final c = complaints[index];
+                  child: filtered.isEmpty
+                      ? const Center(child: Text("No complaints match selection"))
+                      : ListView.builder(
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) {
+                            final c = filtered[index];
 
-                      return Card(
-                        margin: const EdgeInsets.all(10),
-                        child: ListTile(
-                          title: Text(c["title"]),
-                          subtitle: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              Text(c["description"] ?? ""),
-                              const SizedBox(height: 5),
-                              Text(
-                                "Priority: ${c["priority"]}",
-                              ),
-                              Text(
-                                "Status: ${c["status"]}",
-                                style: TextStyle(
-                                  color: getStatusColor(
-                                      c["status"]),
-                                  fontWeight: FontWeight.bold,
+                            return Card(
+                              margin: const EdgeInsets.all(10),
+                              child: ListTile(
+                                title: Text(c["title"]),
+                                subtitle: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(c["description"] ?? ""),
+                                    const SizedBox(height: 5),
+                                    if (widget.role != "tenant") ...[
+                                      Text(
+                                        "Tenant: ${c["tenant_name"] ?? 'N/A'} (${c["tenant_phone"] ?? ''})",
+                                        style: const TextStyle(fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                    if (c["building_name"] != null && c["building_name"].toString().isNotEmpty) ...[
+                                      Text(
+                                        "Unit: ${c["building_name"]} - Flat: ${c["flat_number"] ?? ''} - Room: ${c["room_number"] ?? ''}",
+                                        style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                                      ),
+                                    ],
+                                    Text(
+                                      "Priority: ${c["priority"]}",
+                                    ),
+                                    Text(
+                                      "Status: ${c["status"]}",
+                                      style: TextStyle(
+                                        color: getStatusColor(
+                                            c["status"]),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                trailing: PopupMenuButton(
+                                  itemBuilder: (_) => [
+                                    PopupMenuItem(
+                                      child: const Text("Edit"),
+                                      onTap: () {
+                                        Future.delayed(
+                                          Duration.zero,
+                                          () => openDialog(c: c),
+                                        );
+                                      },
+                                    ),
+
+                                    if (widget.role == "owner")
+                                      PopupMenuItem(
+                                        child: const Text("Delete"),
+                                        onTap: () {
+                                          Future.delayed(
+                                            Duration.zero,
+                                            () => deleteComplaint(c["id"]),
+                                          );
+                                        },
+                                      ),
+                                  ],
                                 ),
                               ),
-                            ],
-                          ),
-
-                          trailing: PopupMenuButton(
-                            itemBuilder: (_) => [
-                              PopupMenuItem(
-                                child: const Text("Edit"),
-                                onTap: () {
-                                  Future.delayed(
-                                    Duration.zero,
-                                    () => openDialog(c: c),
-                                  );
-                                },
-                              ),
-
-                              if (widget.role == "owner")
-                                PopupMenuItem(
-                                  child: const Text("Delete"),
-                                  onTap: () {
-                                    Future.delayed(
-                                      Duration.zero,
-                                      () => deleteComplaint(c["id"]),
-                                    );
-                                  },
-                                ),
-                            ],
-                          ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
                 ),
               ],
             ),

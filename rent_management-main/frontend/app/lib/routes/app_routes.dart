@@ -320,20 +320,7 @@ class AppRoutes {
       ),
     ),
 
-    //////////////////////////////////////////////////////
-    // MAINTENANCE
-    //////////////////////////////////////////////////////
 
-    '/maintenance': (context) =>
-        page(
-      context,
-      (role, userName, renterId) =>
-          MaintenancePage(
-        role: role,
-        userName: userName,
-        renterId: renterId,
-      ),
-    ),
 
     //////////////////////////////////////////////////////
     // DOCUMENTS
@@ -391,20 +378,7 @@ class AppRoutes {
       ),
     ),
 
-    //////////////////////////////////////////////////////
-    // REPORTS
-    //////////////////////////////////////////////////////
 
-    '/reports': (context) =>
-        page(
-      context,
-      (role, userName, renterId) =>
-          ReportsPage(
-        role: role,
-        userName: userName,
-        renterId: renterId,
-      ),
-    ),
 
     //////////////////////////////////////////////////////
     // SETTINGS

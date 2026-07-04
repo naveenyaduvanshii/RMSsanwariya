@@ -223,11 +223,6 @@ class Sidebar extends StatelessWidget {
       },
 
       {
-        "title": "Maintenance",
-        "icon": Icons.build,
-      },
-
-      {
         "title": "Documents",
         "icon": Icons.folder,
       },
@@ -240,11 +235,6 @@ class Sidebar extends StatelessWidget {
       {
         "title": "Notifications",
         "icon": Icons.notifications,
-      },
-
-      {
-        "title": "Reports",
-        "icon": Icons.bar_chart,
       },
 
       {
@@ -309,11 +299,6 @@ class Sidebar extends StatelessWidget {
       {
         "title": "Complaints",
         "icon": Icons.report_problem,
-      },
-
-      {
-        "title": "Maintenance",
-        "icon": Icons.build,
       },
 
       {

@@ -2374,6 +2374,11 @@ def electricity_report_view(request):
         if room:
             readings = readings.filter(room__room_number=room)
 
+        # 6. Room ID filter (for tenant specific report)
+        room_id = request.GET.get("room_id", "").strip()
+        if room_id:
+            readings = readings.filter(room_id=room_id)
+
         total_units = 0.0
         total_amount = 0.0
 
@@ -2767,6 +2772,11 @@ def bills_report_view(request):
                 Q(assignment__tenant__name__icontains=search) |
                 Q(assignment__tenant__phone__icontains=search)
             )
+
+        # 2. Tenant ID filter (for tenant specific report)
+        tenant_id = request.GET.get("tenant_id", "").strip()
+        if tenant_id:
+            bills = bills.filter(assignment__tenant_id=tenant_id)
 
         # 2. Month filter
         month_param = request.GET.get("month", "").strip() # e.g. "2026-05"
@@ -3788,9 +3798,17 @@ def complaints_list(request):
     if request.method == "GET":
         tenant_id = request.GET.get("tenant_id")
         if tenant_id:
-            complaints = Complaint.objects.filter(tenant_id=tenant_id).select_related("tenant", "assignment", "assigned_to").order_by("-created_at")
+            complaints = Complaint.objects.filter(tenant_id=tenant_id).select_related(
+                "tenant", "assignment", "assigned_to",
+                "assignment__rental_unit", "assignment__rental_unit__room",
+                "assignment__rental_unit__flat", "assignment__rental_unit__building"
+            ).order_by("-created_at")
         else:
-            complaints = Complaint.objects.select_related("tenant", "assignment", "assigned_to").order_by("-created_at")
+            complaints = Complaint.objects.select_related(
+                "tenant", "assignment", "assigned_to",
+                "assignment__rental_unit", "assignment__rental_unit__room",
+                "assignment__rental_unit__flat", "assignment__rental_unit__building"
+            ).order_by("-created_at")
 
         data = []
         for item in complaints:
@@ -3798,6 +3816,7 @@ def complaints_list(request):
                 "id": str(item.id),
                 "tenant_id": str(item.tenant.id) if item.tenant else "",
                 "tenant_name": item.tenant.name if item.tenant else "",
+                "tenant_phone": item.tenant.phone if (item.tenant and item.tenant.phone) else "",
                 "assignment_id": str(item.assignment.id) if item.assignment else "",
                 "title": item.title,
                 "description": item.description,
@@ -3806,6 +3825,9 @@ def complaints_list(request):
                 "assigned_to_id": str(item.assigned_to.id) if item.assigned_to else "",
                 "assigned_to_name": item.assigned_to.name if item.assigned_to else "",
                 "created_at": item.created_at.strftime("%d-%m-%Y %H:%M") if item.created_at else "",
+                "room_number": item.assignment.rental_unit.room.room_number if (item.assignment and item.assignment.rental_unit and item.assignment.rental_unit.room) else "",
+                "flat_number": item.assignment.rental_unit.flat.flat_number if (item.assignment and item.assignment.rental_unit and item.assignment.rental_unit.flat) else "",
+                "building_name": item.assignment.rental_unit.building.name if (item.assignment and item.assignment.rental_unit and item.assignment.rental_unit.building) else "",
             })
 
         return JsonResponse({
@@ -4037,351 +4059,8 @@ def delete_complaint(
 
     })
 ########################################################
-# MAINTENANCE REQUESTS LIST
+# MAINTENANCE REQUESTS DELETED
 ########################################################
-
-@csrf_exempt
-def maintenance_requests_list(request):
-
-    if request.method == "GET":
-
-        requests = MaintenanceRequest.objects.select_related(
-
-            "complaint",
-
-            "complaint__tenant",
-
-            "assigned_to"
-
-        ).order_by("-created_at")
-
-        data = []
-
-        for item in requests:
-
-            data.append({
-
-                "id":
-                    str(item.id),
-
-                "complaint_id":
-                    str(item.complaint.id),
-
-                "tenant_name":
-
-                    item.complaint
-                    .tenant
-                    .name,
-
-                "complaint_title":
-
-                    item.complaint
-                    .title,
-
-                "assigned_to":
-
-                    item.assigned_to.name
-
-                    if item.assigned_to
-
-                    else "",
-
-                "notes":
-                    item.notes,
-
-                "status":
-                    item.status,
-
-                "created_at":
-
-                    item.created_at.strftime(
-                        "%d-%m-%Y %H:%M"
-                    ),
-
-                "completed_at":
-
-                    item.completed_at.strftime(
-                        "%d-%m-%Y %H:%M"
-                    )
-
-                    if item.completed_at
-
-                    else None,
-            })
-
-        return JsonResponse({
-
-            "success": True,
-
-            "data":
-                data
-
-        })
-
-    return JsonResponse({
-
-        "success": False
-
-    })
-########################################################
-# CREATE MAINTENANCE REQUEST
-########################################################
-
-@csrf_exempt
-def create_maintenance_request(request):
-
-    if request.method == "POST":
-
-        try:
-
-            body = json.loads(request.body)
-
-            complaint = Complaint.objects.get(
-
-                id=body.get("complaint_id")
-
-            )
-
-            assigned_to = None
-
-            if body.get("assigned_to"):
-
-                assigned_to = Users.objects.get(
-
-                    id=body.get("assigned_to")
-
-                )
-
-            maintenance = (
-
-                MaintenanceRequest.objects.create(
-
-                    complaint=complaint,
-
-                    assigned_to=
-                        assigned_to,
-
-                    notes=
-                        body.get(
-                            "notes",
-                            ""
-                        ),
-
-                    status="pending"
-                )
-            )
-
-            complaint.status = "in_progress"
-
-            complaint.save()
-
-            return JsonResponse({
-
-                "success": True,
-
-                "message":
-
-                    "Maintenance request created",
-
-                "id":
-
-                    str(maintenance.id)
-
-            })
-
-        except Exception as e:
-
-            return JsonResponse({
-
-                "success": False,
-
-                "message":
-
-                    str(e)
-
-            })
-
-    return JsonResponse({
-
-        "success": False
-
-    })
-########################################################
-# UPDATE MAINTENANCE REQUEST
-########################################################
-
-@csrf_exempt
-def update_maintenance_request(
-    request,
-    request_id
-):
-
-    if request.method == "PUT":
-
-        try:
-
-            body = json.loads(request.body)
-
-            maintenance = (
-
-                MaintenanceRequest.objects.get(
-
-                    id=request_id
-
-                )
-            )
-
-            maintenance.notes = body.get(
-
-                "notes",
-
-                maintenance.notes
-
-            )
-
-            maintenance.status = body.get(
-
-                "status",
-
-                maintenance.status
-
-            )
-
-            if body.get("assigned_to"):
-
-                maintenance.assigned_to = Users.objects.get(
-
-                    id=body.get("assigned_to")
-
-                )
-
-            if maintenance.status == "completed":
-
-                maintenance.completed_at = timezone.now()
-
-                maintenance.complaint.status = "resolved"
-
-                maintenance.complaint.resolved_at = timezone.now()
-
-                maintenance.complaint.save()
-
-            maintenance.save()
-
-            return JsonResponse({
-
-                "success": True,
-
-                "message":
-
-                    "Maintenance updated successfully"
-
-            })
-
-        except Exception as e:
-
-            return JsonResponse({
-
-                "success": False,
-
-                "message":
-
-                    str(e)
-
-            })
-
-    return JsonResponse({
-
-        "success": False
-
-    })
-########################################################
-# UPDATE MAINTENANCE REQUEST
-########################################################
-
-@csrf_exempt
-def update_maintenance_request(
-    request,
-    request_id
-):
-
-    if request.method == "PUT":
-
-        try:
-
-            body = json.loads(request.body)
-
-            maintenance = (
-
-                MaintenanceRequest.objects.get(
-
-                    id=request_id
-
-                )
-            )
-
-            maintenance.notes = body.get(
-
-                "notes",
-
-                maintenance.notes
-
-            )
-
-            maintenance.status = body.get(
-
-                "status",
-
-                maintenance.status
-
-            )
-
-            if body.get("assigned_to"):
-
-                maintenance.assigned_to = Users.objects.get(
-
-                    id=body.get("assigned_to")
-
-                )
-
-            if maintenance.status == "completed":
-
-                maintenance.completed_at = timezone.now()
-
-                maintenance.complaint.status = "resolved"
-
-                maintenance.complaint.resolved_at = timezone.now()
-
-                maintenance.complaint.save()
-
-            maintenance.save()
-
-            return JsonResponse({
-
-                "success": True,
-
-                "message":
-
-                    "Maintenance updated successfully"
-
-            })
-
-        except Exception as e:
-
-            return JsonResponse({
-
-                "success": False,
-
-                "message":
-
-                    str(e)
-
-            })
-
-    return JsonResponse({
-
-        "success": False
-
-    })
 
 ########################################################
 # DOCUMENTS LIST
@@ -4784,7 +4463,10 @@ def create_vacate_notice(request):
 # =====================================================
 
 def list_vacate_notices(request):
-    notices = VacateNotice.objects.select_related("tenant", "assignment").all()
+    notices = VacateNotice.objects.select_related(
+        "tenant", "assignment", "assignment__rental_unit",
+        "assignment__rental_unit__room", "assignment__rental_unit__flat", "assignment__rental_unit__building"
+    ).all()
 
     data = []
     for n in notices:
@@ -4792,12 +4474,16 @@ def list_vacate_notices(request):
             "id": str(n.id),
             "tenant": str(n.tenant_id),
             "tenant_name": n.tenant.name if n.tenant else "",
+            "tenant_phone": n.tenant.phone if (n.tenant and n.tenant.phone) else "",
             "assignment": str(n.assignment_id),
             "notice_date": n.notice_date,
             "vacate_date": n.vacate_date,
             "reason": n.reason,
             "status": n.status,
             "approved_by": str(n.approved_by_id) if n.approved_by_id else None,
+            "room_number": n.assignment.rental_unit.room.room_number if (n.assignment and n.assignment.rental_unit and n.assignment.rental_unit.room) else "",
+            "flat_number": n.assignment.rental_unit.flat.flat_number if (n.assignment and n.assignment.rental_unit and n.assignment.rental_unit.flat) else "",
+            "building_name": n.assignment.rental_unit.building.name if (n.assignment and n.assignment.rental_unit and n.assignment.rental_unit.building) else "",
         })
 
     return JsonResponse(data, safe=False)

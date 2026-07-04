@@ -154,11 +154,9 @@ class AppDrawer extends StatelessWidget {
         {"title": "Payments", "icon": Icons.payments},
         {"title": "Electricity", "icon": Icons.electric_bolt},
         {"title": "Complaints", "icon": Icons.report_problem},
-        {"title": "Maintenance", "icon": Icons.build},
         {"title": "Documents", "icon": Icons.folder},
         {"title": "Vacate Requests", "icon": Icons.logout},
         {"title": "Notifications", "icon": Icons.notifications},
-        {"title": "Reports", "icon": Icons.bar_chart},
         {"title": "Settings", "icon": Icons.settings},
       ];
     }
@@ -175,7 +173,6 @@ class AppDrawer extends StatelessWidget {
         {"title": "Payments", "icon": Icons.payments},
         {"title": "Electricity", "icon": Icons.electric_bolt},
         {"title": "Complaints", "icon": Icons.report_problem},
-        {"title": "Maintenance", "icon": Icons.build},
         {"title": "Documents", "icon": Icons.folder},
         {"title": "Vacate Requests", "icon": Icons.logout},
         {"title": "Notifications", "icon": Icons.notifications},

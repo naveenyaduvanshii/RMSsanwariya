@@ -990,12 +990,14 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
                 children: [
                   _buildHeaderSection(),
                   const SizedBox(height: 20),
-                  _buildSearchAndToggleRow(),
-                  if (showFilters) ...[
-                    const SizedBox(height: 12),
-                    _buildFiltersPanel(isDesktop),
+                  if (widget.role != "tenant") ...[
+                    _buildSearchAndToggleRow(),
+                    if (showFilters) ...[
+                      const SizedBox(height: 12),
+                      _buildFiltersPanel(isDesktop),
+                    ],
+                    const SizedBox(height: 20),
                   ],
-                  const SizedBox(height: 20),
                   filteredAssignments.isEmpty
                       ? const Center(
                           child: Padding(

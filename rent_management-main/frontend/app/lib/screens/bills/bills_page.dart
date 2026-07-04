@@ -453,7 +453,8 @@ class _BillsPageState extends State<BillsPage> {
   }
 
   void downloadPdfReport() {
-    final String url = "$baseUrl/api/bills/report/pdf/?search=$searchQuery&status=$statusFilter&building=${selectedBuilding ?? ''}&floor=${selectedFloor ?? ''}&aging=$overdueFilter&month=${selectedMonth ?? ''}";
+    final String tenantParam = widget.role == "tenant" ? "&tenant_id=${widget.renterId}" : "";
+    final String url = "$baseUrl/api/bills/report/pdf/?search=$searchQuery&status=$statusFilter&building=${selectedBuilding ?? ''}&floor=${selectedFloor ?? ''}&aging=$overdueFilter&month=${selectedMonth ?? ''}$tenantParam";
     launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 
@@ -701,6 +702,7 @@ class _BillsPageState extends State<BillsPage> {
                   const SizedBox(height: 15),
                   ],
 
+                  if (widget.role != "tenant") ...[
                   // FILTERS ACCORDION / BOX
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -923,6 +925,7 @@ class _BillsPageState extends State<BillsPage> {
                     ),
                   ),
                   const SizedBox(height: 15),
+                  ]
 
                   // BILL LIST
                   filteredList.isEmpty

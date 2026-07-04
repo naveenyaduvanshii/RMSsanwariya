@@ -175,6 +175,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
                     const SizedBox(height: 15),
                   ],
 
+                  if (widget.role != "tenant") ...[
                   // SEARCH & FILTERS CONTAINER
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -226,6 +227,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
                     ),
                   ),
                   const SizedBox(height: 15),
+                  ],
 
                   // LEDGER LIST
                   paidList.isEmpty

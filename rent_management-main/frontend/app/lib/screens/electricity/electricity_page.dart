@@ -111,7 +111,8 @@ class _ElectricityPageState extends State<ElectricityPage> {
         "floor=${filterFloor ?? ''}&"
         "flat=${filterFlat ?? ''}&"
         "room=${filterRoom ?? ''}&"
-        "month=${filterMonth ?? ''}";
+        "month=${filterMonth ?? ''}&"
+        "room_id=${activeRoomId ?? ''}";
     launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 
@@ -581,6 +582,7 @@ class _ElectricityPageState extends State<ElectricityPage> {
                   ),
                   const SizedBox(height: 15),
 
+                  if (widget.role != "tenant") ...[
                   // FILTERS CONTROLLER ACCORDION / BOX
                   Container(
                     width: double.infinity,
@@ -773,6 +775,7 @@ class _ElectricityPageState extends State<ElectricityPage> {
                     ),
                   ),
                   const SizedBox(height: 15),
+                  ]
 
                   // SCROLLABLE LEDGER DATA OVERVIEW
                   filteredReadings.isEmpty

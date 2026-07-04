@@ -31,6 +31,8 @@ class _VacatePipelinePageState
 
   final TextEditingController reasonController = TextEditingController();
   DateTime? selectedVacateDate;
+  final TextEditingController searchController = TextEditingController();
+  String searchQuery = "";
   String? activeAssignmentId;
 
   Future<void> fetchActiveAssignment() async {
@@ -228,12 +230,29 @@ class _VacatePipelinePageState
     }
   }
 
+  List getFilteredNotices() {
+    // If tenant, only show their own notices
+    final filtered = widget.role == "tenant"
+        ? notices.where((n) => n["tenant"].toString() == widget.renterId).toList()
+        : notices;
+
+    if (searchQuery.isEmpty) return filtered;
+    final q = searchQuery.toLowerCase();
+    return filtered.where((n) {
+      final name = (n["tenant_name"] ?? "").toString().toLowerCase();
+      final phone = (n["tenant_phone"] ?? "").toString().toLowerCase();
+      return name.contains(q) || phone.contains(q);
+    }).toList();
+  }
+
   ////////////////////////////////////////////////////////////
   /// UI
   ////////////////////////////////////////////////////////////
 
   @override
   Widget build(BuildContext context) {
+    final filtered = getFilteredNotices();
+
     return MainLayout(
       role: widget.role,
       userName: widget.userName,
@@ -262,18 +281,54 @@ class _VacatePipelinePageState
                     ),
                   ),
                 ],
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: notices.length,
-                    itemBuilder: (context, index) {
-                      final n = notices[index];
-                      if (widget.role == "tenant" && n["tenant"].toString() != widget.renterId) {
-                        return const SizedBox.shrink();
-                      }
-                      return _pipelineCard(n);
-                    },
+
+                //////////////////////////////////////////////////////
+                /// SEARCH BAR (Owner / Manager Only)
+                //////////////////////////////////////////////////////
+
+                if (widget.role != "tenant") ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    child: TextField(
+                      controller: searchController,
+                      decoration: InputDecoration(
+                        labelText: "Search by tenant name or mobile...",
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        suffixIcon: searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  setState(() {
+                                    searchController.clear();
+                                    searchQuery = "";
+                                  });
+                                },
+                              )
+                            : null,
+                      ),
+                      onChanged: (val) {
+                        setState(() {
+                          searchQuery = val;
+                        });
+                      },
+                    ),
                   ),
+                ],
+
+                Expanded(
+                  child: filtered.isEmpty
+                      ? const Center(child: Text("No vacate notices match selection"))
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) {
+                            final n = filtered[index];
+                            return _pipelineCard(n);
+                          },
+                        ),
                 ),
               ],
             ),
@@ -322,7 +377,9 @@ class _VacatePipelinePageState
             children: [
               Expanded(
                 child: Text(
-                  "Tenant: ${n['tenant_name'] ?? n['tenant']}",
+                  widget.role == "tenant"
+                      ? "Tenant: ${n['tenant_name'] ?? n['tenant']}"
+                      : "Tenant: ${n['tenant_name'] ?? n['tenant']} (${n['tenant_phone'] ?? ''})",
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -336,6 +393,14 @@ class _VacatePipelinePageState
           ),
 
           const SizedBox(height: 15),
+
+          if (n["building_name"] != null && n["building_name"].toString().isNotEmpty) ...[
+            Text(
+              "Unit: ${n["building_name"]} - Flat: ${n["flat_number"] ?? ''} - Room: ${n["room_number"] ?? ''}",
+              style: TextStyle(color: Colors.grey.shade700, fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 5),
+          ],
 
           Text("Vacate Date: ${n['vacate_date']}"),
           Text("Reason: ${n['reason'] ?? ''}"),

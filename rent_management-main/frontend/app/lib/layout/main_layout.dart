@@ -97,11 +97,9 @@ class _MainLayoutState extends State<MainLayout> {
         '/payments',
         '/electricity',
         '/complaints',
-        '/maintenance',
         '/documents',
         '/vacate-requests',
         '/notifications',
-        '/reports',
         '/settings',
       ];
     }
@@ -119,7 +117,6 @@ class _MainLayoutState extends State<MainLayout> {
         '/payments',
         '/electricity',
         '/complaints',
-        '/maintenance',
         '/documents',
         '/vacate-requests',
         '/notifications',
@@ -164,11 +161,9 @@ class _MainLayoutState extends State<MainLayout> {
         "Payments",
         "Electricity",
         "Complaints",
-        "Maintenance",
         "Documents",
         "Vacate Requests",
         "Notifications",
-        "Reports",
         "Settings",
       ];
     }
@@ -186,7 +181,6 @@ class _MainLayoutState extends State<MainLayout> {
         "Payments",
         "Electricity",
         "Complaints",
-        "Maintenance",
         "Documents",
         "Vacate Requests",
         "Notifications",
