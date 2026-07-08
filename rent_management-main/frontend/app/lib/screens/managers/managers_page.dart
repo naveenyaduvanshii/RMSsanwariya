@@ -168,6 +168,37 @@ class _ManagersPageState extends State<ManagersPage> {
   /// ========================================================
   /// DELETE MANAGER
   /// ========================================================
+  Future<void> confirmDeleteManager(dynamic id, String name) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text("Delete Manager"),
+          content: Text("Are you sure you want to delete manager '$name'? This action cannot be undone."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Delete", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == true) {
+      await deleteManager(id);
+    }
+  }
+
   Future<void> deleteManager(dynamic id) async {
     try {
       final response = await http.delete(
@@ -268,7 +299,7 @@ class _ManagersPageState extends State<ManagersPage> {
                       const SizedBox(width: 15),
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () => deleteManager(manager["id"]),
+                          onPressed: () => confirmDeleteManager(manager["id"], manager["name"] ?? "this manager"),
                           icon: const Icon(Icons.delete),
                           label: const Text("Delete"),
                           style: ElevatedButton.styleFrom(

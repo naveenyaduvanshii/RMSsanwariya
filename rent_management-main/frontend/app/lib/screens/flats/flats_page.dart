@@ -151,6 +151,37 @@ class _FlatsPageState extends State<FlatsPage> {
     }
   }
 
+  Future<void> confirmDeleteFlat(String flatId, String flatNumber) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text("Delete Flat"),
+          content: Text("Are you sure you want to delete flat '$flatNumber'? All associated rooms and rental units will also be deleted."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Delete", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == true) {
+      await deleteFlat(flatId);
+    }
+  }
+
   Future<void> deleteFlat(String flatId) async {
     try {
       await ApiService.delete("api/delete-flat/$flatId/");
@@ -461,7 +492,7 @@ class _FlatsPageState extends State<FlatsPage> {
                                           icon: const Icon(Icons.delete,
                                               color: Colors.red),
                                           onPressed: () =>
-                                              deleteFlat(flat["id"]),
+                                              confirmDeleteFlat(flat["id"], flat["flat_number"] ?? ""),
                                         ),
                                       ],
                                     )

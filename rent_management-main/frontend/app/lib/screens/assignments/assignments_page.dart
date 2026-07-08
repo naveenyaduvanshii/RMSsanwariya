@@ -30,6 +30,7 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
   bool isSaving = false;
   bool isEdit = false;
   String editId = "";
+  StateSetter? dialogSetState;
 
   final searchController = TextEditingController();
   final securityDepositController = TextEditingController();
@@ -359,6 +360,7 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
   Future<void> addAssignment() async {
     if (!validateForm()) return;
     setState(() => isSaving = true);
+    if (dialogSetState != null) dialogSetState!(() {});
     try {
       final res = await ApiService.post(
         "api/add-tenant-assignment/",
@@ -382,13 +384,17 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
       debugPrint("Add Assignment Error: $e");
       showMessage(e.toString().replaceAll("Exception:", "").trim());
     } finally {
-      if (mounted) setState(() => isSaving = false);
+      if (mounted) {
+        setState(() => isSaving = false);
+        if (dialogSetState != null) dialogSetState!(() {});
+      }
     }
   }
 
   Future<void> updateAssignment() async {
     if (editId.isEmpty) return;
     setState(() => isSaving = true);
+    if (dialogSetState != null) dialogSetState!(() {});
     try {
       await ApiService.put(
         "api/update-tenant-assignment/$editId/",
@@ -408,7 +414,10 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
       debugPrint("Update Assignment Error: $e");
       showMessage("Update Failed");
     } finally {
-      if (mounted) setState(() => isSaving = false);
+      if (mounted) {
+        setState(() => isSaving = false);
+        if (dialogSetState != null) dialogSetState!(() {});
+      }
     }
   }
 
@@ -521,6 +530,7 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
       builder: (_) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            dialogSetState = setDialogState;
             final Map<String, String> buildingMap = {};
             for (var u in rentalUnits) {
               final bId = u["building_id"]?.toString();
@@ -757,9 +767,12 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
                 ElevatedButton(
                   onPressed: isSaving
                       ? null
-                      : () {
+                      : () async {
                           if (isEdit) {
-                            updateAssignment();
+                            setDialogState(() {
+                              isSaving = true;
+                            });
+                            await updateAssignment();
                           } else {
                             if (exclusiveOccupancy) {
                               final unit = rentalUnits.firstWhere(
@@ -786,7 +799,10 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
                                 return;
                               }
                             }
-                            addAssignment();
+                            setDialogState(() {
+                              isSaving = true;
+                            });
+                            await addAssignment();
                           }
                         },
                   child: isSaving
@@ -798,7 +814,9 @@ class _TenantAssignmentsPageState extends State<TenantAssignmentsPage> {
           },
         );
       },
-    );
+    ).then((_) {
+      dialogSetState = null;
+    });
   }
 
   Widget buildAssignmentCard(Map assignment) {

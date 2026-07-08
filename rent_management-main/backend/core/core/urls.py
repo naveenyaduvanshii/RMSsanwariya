@@ -46,6 +46,7 @@ urlpatterns = [
     path("api/assignments/report/pdf/", views.assignments_report_view),
     path("api/tenants-dropdown/",views.tenants_dropdown,name="tenants_dropdown",),
     path("api/rental-units-dropdown/",views.rental_units_dropdown,name="rental_units_dropdown",),
+    path("api/rental-units/report/pdf/", views.rental_units_report_view),
     path("api/rental-units/",views.rental_units_list),
     path("api/rental-units/create/",views.create_rental_unit),
     path("api/rental-units/<uuid:rental_unit_id>/update/",views.update_rental_unit),

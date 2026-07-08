@@ -141,6 +141,37 @@ class _BuildingsPageState extends State<BuildingsPage> {
   ////////////////////////////////////////////////////////////
   /// DELETE
   ////////////////////////////////////////////////////////////
+  Future<void> confirmDeleteBuilding(String id, String name) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text("Delete Building"),
+          content: Text("Are you sure you want to delete building '$name'? All associated floors, flats, rooms, and assignments will be deleted."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Delete", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == true) {
+      await deleteBuilding(id);
+    }
+  }
+
   Future<void> deleteBuilding(String id) async {
     try {
       final response = await http.delete(
@@ -343,7 +374,7 @@ class _BuildingsPageState extends State<BuildingsPage> {
                                   icon: const Icon(Icons.delete,
                                       color: Colors.red),
                                   onPressed: () =>
-                                      deleteBuilding(b["id"]),
+                                      confirmDeleteBuilding(b["id"], b["name"] ?? "this building"),
                                 ),
                               ],
                             ),

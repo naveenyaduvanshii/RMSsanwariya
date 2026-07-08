@@ -338,6 +338,25 @@ class Room(models.Model):
     def __str__(self):
         return self.room_number
 
+    def delete(self, *args, **kwargs):
+        flat = self.flat
+        super().delete(*args, **kwargs)
+        if flat:
+            if not Room.objects.filter(flat=flat).exists():
+                from .models import RentalUnit
+                if not RentalUnit.objects.filter(flat=flat, unit_type="flat").exists():
+                    RentalUnit.objects.create(
+                        unit_type="flat",
+                        building=flat.building,
+                        floor=flat.floor,
+                        flat=flat,
+                        rent=flat.base_rent,
+                        capacity=flat.capacity,
+                        allow_sharing=flat.allow_sharing,
+                        status="vacant"
+                    )
+
+
 
 
 

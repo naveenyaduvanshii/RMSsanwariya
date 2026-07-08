@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../layout/main_layout.dart';
 
@@ -262,7 +263,7 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
   }
 
   Future<void> confirmDeleteUnit(Map unit) async {
-    bool deleteUnderlying = false;
+    bool deleteUnderlying = true;
     final unitType = unit["unit_type"] ?? "unit";
     final unitId = unit["id"];
 
@@ -323,6 +324,115 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
     if (result == true) {
       await deleteUnit(unitId, deleteUnderlying: deleteUnderlying);
     }
+  }
+
+  void downloadPdfReport() {
+    final search = searchQuery.trim();
+    final building = selectedBuildingId ?? "";
+    final floor = selectedFloorId ?? "";
+    final flat = selectedFlatId ?? "";
+    final room = selectedRoomId ?? "";
+    final status = selectedStatus ?? "";
+    final policy = filterOccupancyPolicy ?? "";
+    final sort = selectedSort;
+
+    final url = "$baseUrl/api/rental-units/report/pdf/?"
+        "search=${Uri.encodeComponent(search)}"
+        "&building=${Uri.encodeComponent(building)}"
+        "&floor=${Uri.encodeComponent(floor)}"
+        "&flat=${Uri.encodeComponent(flat)}"
+        "&room=${Uri.encodeComponent(room)}"
+        "&status=${Uri.encodeComponent(status)}"
+        "&policy=${Uri.encodeComponent(policy)}"
+        "&sort=${Uri.encodeComponent(sort)}";
+
+    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  Widget _buildReportOptionsButton(BuildContext context, {required bool isFullWidth}) {
+    return PopupMenuButton<String>(
+      tooltip: "Report Options",
+      onSelected: (value) {
+        if (value == 'download') {
+          downloadPdfReport();
+        } else if (value == 'print') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Opening print preview...")),
+          );
+          downloadPdfReport();
+        } else if (value == 'whatsapp') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("WhatsApp integration will be added later.")),
+          );
+        }
+      },
+      itemBuilder: (BuildContext context) => [
+        const PopupMenuItem<String>(
+          value: 'download',
+          child: Row(
+            children: [
+              Icon(Icons.download, color: Colors.blue),
+              SizedBox(width: 10),
+              Text("Download PDF", style: TextStyle(color: Color(0xFF1E293B))),
+            ],
+          ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'print',
+          child: Row(
+            children: [
+              Icon(Icons.print, color: Colors.indigo),
+              SizedBox(width: 10),
+              Text("Print", style: TextStyle(color: Color(0xFF1E293B))),
+            ],
+          ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'whatsapp',
+          child: Row(
+            children: [
+              Icon(Icons.chat, color: Colors.green),
+              SizedBox(width: 10),
+              Text("WhatsApp", style: TextStyle(color: Color(0xFF1E293B))),
+            ],
+          ),
+        ),
+      ],
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          width: isFullWidth ? double.infinity : null,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.summarize_outlined, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Text(
+                "Report Options",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void clearFields() {
@@ -768,6 +878,8 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
                                 label: const Text("Add Rental Unit", style: TextStyle(fontWeight: FontWeight.bold)),
                               ),
                             ),
+                            const SizedBox(height: 10),
+                            _buildReportOptionsButton(context, isFullWidth: true),
                           ],
                         );
                       } else {
@@ -778,16 +890,22 @@ class _RentalUnitsPageState extends State<RentalUnitsPage> {
                               "${filtered.length} Rental Units Found",
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B)),
                             ),
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF1E3A8A),
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            Row(
+                              children: [
+                                _buildReportOptionsButton(context, isFullWidth: false),
+                                const SizedBox(width: 12),
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF1E3A8A),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    ),
+                                  onPressed: () => openDialog(),
+                                  icon: const Icon(Icons.add, size: 18),
+                                  label: const Text("Add Rental Unit", style: TextStyle(fontWeight: FontWeight.bold)),
                                 ),
-                              onPressed: () => openDialog(),
-                              icon: const Icon(Icons.add, size: 18),
-                              label: const Text("Add Rental Unit", style: TextStyle(fontWeight: FontWeight.bold)),
+                              ],
                             ),
                           ],
                         );
